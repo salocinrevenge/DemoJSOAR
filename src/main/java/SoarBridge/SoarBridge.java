@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Logger;
 import org.jsoar.kernel.Agent;
@@ -49,6 +50,9 @@ public class SoarBridge
     Identifier creatureParameters;
     Identifier creaturePosition;
     Identifier creatureMemory;
+
+    // arraylist of objects that is the memory of the creature
+    public ArrayList<Thing> creatureMemoryList = new ArrayList<Thing>();
     
     Environment env;
     public Creature c;
@@ -152,7 +156,7 @@ public class SoarBridge
               // Set Creature Parameters
               Calendar lCDateTime = Calendar.getInstance();
               creatureParameters = CreateIdWME(creature, "PARAMETERS");
-              CreateFloatWME(creatureParameters, "MINFUEL", 400);
+              CreateFloatWME(creatureParameters, "MINFUEL", 300);
               CreateFloatWME(creatureParameters, "TIMESTAMP", lCDateTime.getTimeInMillis());
               // Setting creature Position
               creaturePosition = CreateIdWME(creature, "POSITION");
@@ -176,8 +180,85 @@ public class SoarBridge
                  CreateFloatWME(entity, "Y2", t.getY2());
                  CreateStringWME(entity, "TYPE", getItemType(t.getCategory()));
                  CreateStringWME(entity, "NAME", t.getName());
-                 CreateStringWME(entity, "COLOR",Constants.getColorName(t.getMaterial().getColor()));                                                    
+                 CreateStringWME(entity, "COLOR",Constants.getColorName(t.getMaterial().getColor())); 
+                 // Adciiona na memória se ainda não estiver
+                 boolean alreadyInMemory = false;
+                 for (Thing tm : creatureMemoryList)
+                    {
+                        if (tm.getName().equalsIgnoreCase(t.getName())) alreadyInMemory = true;
+                    }
+                 if (!alreadyInMemory) creatureMemoryList.add(t);                                                   
                 }
+
+                //Adiciona na visão todos os objetos da memoria que não estão mais na visão, depois de recomputar a distancia para o agente
+                for (Thing tm : creatureMemoryList)
+                {
+                    boolean stillInVision = false;
+                    for (Thing t : thingsList)                    {
+                        if (tm.getName().equalsIgnoreCase(t.getName())) stillInVision = true;
+                    }
+                    if (!stillInVision)                    {
+                        Identifier entity = CreateIdWME(visual, "ENTITY");
+                        CreateFloatWME(entity, "DISTANCE", GetGeometricDistanceToCreature(tm.getX1(),tm.getY1(),tm.getX2(),tm.getY2(),c.getPosition().getX(),c.getPosition().getY()));                                                    
+                        CreateFloatWME(entity, "X", tm.getX1());
+                        CreateFloatWME(entity, "Y", tm.getY1());
+                        CreateFloatWME(entity, "X2", tm.getX2());
+                        CreateFloatWME(entity, "Y2", tm.getY2());
+                        CreateStringWME(entity, "TYPE", getItemType(tm.getCategory()));
+                        CreateStringWME(entity, "NAME", tm.getName());
+                        CreateStringWME(entity, "COLOR",Constants.getColorName(tm.getMaterial().getColor())); 
+                    }
+                }
+
+                //Compara o saco com cada leaflet e computa quanto falta para cada um, depois soma 1 em todos e divide pela pontuação.
+                // O Soar usa esses valores para desempatar e decidir qual leaflet priorizar.
+                List<ws3dproxy.model.Leaflet> leaflets = c.getLeaflets();
+                ws3dproxy.model.Bag bag = c.getBag();
+                if (leaflets != null && !leaflets.isEmpty())
+                {
+                    Identifier leafletsWme = CreateIdWME(creature, "LEAFLETS");
+
+                    for (ws3dproxy.model.Leaflet leaflet : leaflets)
+                    {
+                        Identifier leafletWme = CreateIdWME(leafletsWme, "LEAFLET");
+                        CreateFloatWME(leafletWme, "ID", leaflet.getID());
+                        CreateFloatWME(leafletWme, "PAYMENT", leaflet.getPayment());
+
+                        @SuppressWarnings("unchecked")
+                        Map<String, Integer[]> items = leaflet.getItems();
+                        int missingTotal = 0;
+                        int missingColorCount = 0;
+
+                        for (Map.Entry<String, Integer[]> itemEntry : items.entrySet())
+                        {
+                            String color = itemEntry.getKey();
+                            int required = leaflet.getTotalNumberOfType(color);
+                            int inBag = (bag != null) ? bag.getNumberCrystalPerType(color) : 0;
+                            int missing = Math.max(required - inBag, 0);
+
+                            if (missing > 0)
+                            {
+                                Identifier missingWme = CreateIdWME(leafletWme, "MISSING_COLOR");
+                                CreateStringWME(missingWme, "COLOR", color);
+                                CreateFloatWME(missingWme, "COUNT", missing);
+                                missingTotal += missing;
+                                missingColorCount++;
+                            }
+                        }
+
+                        double score = ((double) missingTotal + 1.0) / Math.max(leaflet.getPayment(), 1);
+                        CreateFloatWME(leafletWme, "MISSING", missingTotal);
+                        CreateFloatWME(leafletWme, "MISSING_COLORS", missingColorCount);
+                        CreateFloatWME(leafletWme, "SCORE", score);
+
+                        if (missingTotal == 0)
+                        {
+                            CreateStringWME(leafletWme, "ACTION", "DELIVER");
+                        }
+                    }
+                }
+
+
             }
         }
         catch (Exception e)
@@ -326,6 +407,18 @@ public class SoarBridge
                             }
                             break;
 
+                        case DELIVER:
+                            String leafletIdToDeliver = null;
+                            command = new Command(Command.CommandType.DELIVER);
+                            CommandDeliver commandDeliver = (CommandDeliver)command.getCommandArgument();
+                            if (commandDeliver != null)
+                            {
+                                leafletIdToDeliver = GetParameterValue("ID");
+                                if (leafletIdToDeliver != null) commandDeliver.setLeafletId(leafletIdToDeliver);
+                                commandList.add(command);
+                            }
+                            break;
+
                         default:
                             break;
                     }   
@@ -413,6 +506,10 @@ public class SoarBridge
                         processEatCommand((CommandEat)command.getCommandArgument());
                     break;
 
+                    case DELIVER:
+                        processDeliverCommand((CommandDeliver)command.getCommandArgument());
+                    break;
+
                     default:System.out.println("Nenhum comando definido ...");
                         // Do nothing
                     break;
@@ -454,6 +551,15 @@ public class SoarBridge
         if (soarCommandGet != null)
         {
             c.putInSack(soarCommandGet.getThingName());
+            // Remove da memoria visual
+            for (Thing t : creatureMemoryList)
+            {
+                if (t.getName().equalsIgnoreCase(soarCommandGet.getThingName()))
+                {
+                    creatureMemoryList.remove(t);
+                    break;
+                }
+            }
         }
         else
         {
@@ -470,10 +576,35 @@ public class SoarBridge
         if (soarCommandEat != null)
         {
             c.eatIt(soarCommandEat.getThingName());
+            // Remove da memoria visual
+            for (Thing t : creatureMemoryList)
+            {
+                if (t.getName().equalsIgnoreCase(soarCommandEat.getThingName()))
+                {
+                    creatureMemoryList.remove(t);
+                    break;
+                }
+            }
         }
         else
         {
             logger.severe("Error processing processMoveCommand");
+        }
+    }
+
+    /**
+     * Send Deliver Command to World Server
+     * @param soarCommandDeliver Soar Deliver Command Structure
+     */
+    private void processDeliverCommand(CommandDeliver soarCommandDeliver) throws CommandExecException
+    {
+        if (soarCommandDeliver != null)
+        {
+            c.deliverLeaflet(soarCommandDeliver.getLeafletId());
+        }
+        else
+        {
+            logger.severe("Error processing processDeliverCommand");
         }
     }
     

@@ -473,3 +473,105 @@ sp {halt*condition
    (write |The command: | <attr> | was issued! |)
    (interrupt) 
 }     
+
+#############################  DELIVER LEAFLET  ################################
+
+# Propose*deliver*leaflet:
+sp {propose*deliver*leaflet
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletId>)
+   (<leaflet> ^MISSING <missing> 0)
+-->
+   (<s> ^operator <o> +)
+   (<o> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet>)
+   (<leaflet> ^ID <leafletId>)}
+
+# Apply*deliver*leaflet:
+sp {apply*deliver*leaflet
+   (state <s> ^operator <o>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<o> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet>)
+   (<leaflet> ^ID <leafletId>)
+   (<leaflet> ^MISSING 0)
+-->
+   (<ol> ^DELIVER <command>)
+   (<command> ^ID <leafletId>)
+}
+
+# Prefer leaflets with the smallest score.
+sp {pref*deliverLeaflet*deliverLeaflet*less*score
+   (state <s> ^operator <o> +
+                    <o2> +)
+   (<o> ^name deliverLeaflet)
+   (<o2> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet1>)
+   (<o2> ^parameter <leaflet2>)
+   (<leaflet1> ^SCORE <score1>)
+   (<leaflet2> ^SCORE <score2>)
+   (<score1> < <score2>)
+-->
+   (<s> ^operator <o> > <o2>)
+   (write |deliverLeaflet | <score1> | less than | <score2> (crlf))}
+
+sp {pref*deliverLeaflet*deliverLeaflet*equal*score*less*missingColors
+   (state <s> ^operator <o> +
+                    <o2> +)
+   (<o> ^name deliverLeaflet)
+   (<o2> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet1>)
+   (<o2> ^parameter <leaflet2>)
+   (<leaflet1> ^SCORE <score1>)
+   (<leaflet2> ^SCORE <score2>)
+   (<score1> == <score2>)
+   (<leaflet1> ^MISSING_COLORS <missingColors1>)
+   (<leaflet2> ^MISSING_COLORS <missingColors2>)
+   (<missingColors1> < <missingColors2>)
+-->
+   (<s> ^operator <o> > <o2>)
+   (write |deliverLeaflet tie by score - fewer missing colors wins| (crlf))}
+
+sp {pref*deliverLeaflet*deliverLeaflet*equal*score*equal*missingColors*less*missing
+   (state <s> ^operator <o> +
+                    <o2> +)
+   (<o> ^name deliverLeaflet)
+   (<o2> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet1>)
+   (<o2> ^parameter <leaflet2>)
+   (<leaflet1> ^SCORE <score1>)
+   (<leaflet2> ^SCORE <score2>)
+   (<score1> == <score2>)
+   (<leaflet1> ^MISSING_COLORS <missingColors1>)
+   (<leaflet2> ^MISSING_COLORS <missingColors2>)
+   (<missingColors1> == <missingColors2>)
+   (<leaflet1> ^MISSING <missing1>)
+   (<leaflet2> ^MISSING <missing2>)
+   (<missing1> < <missing2>)
+-->
+   (<s> ^operator <o> > <o2>)
+   (write |deliverLeaflet tie by score/colors - fewer missing items wins| (crlf))}
+
+sp {pref*deliverLeaflet*deliverLeaflet*equal*score*equal*missingColors*equal*missing
+   (state <s> ^operator <o> +
+                    <o2> +)
+   (<o> ^name deliverLeaflet)
+   (<o2> ^name deliverLeaflet)
+   (<o> ^parameter <leaflet1>)
+   (<o2> ^parameter <leaflet2>)
+   (<leaflet1> ^SCORE <score1>)
+   (<leaflet2> ^SCORE <score2>)
+   (<score1> == <score2>)
+   (<leaflet1> ^MISSING_COLORS <missingColors1>)
+   (<leaflet2> ^MISSING_COLORS <missingColors2>)
+   (<missingColors1> == <missingColors2>)
+   (<leaflet1> ^MISSING <missing1>)
+   (<leaflet2> ^MISSING <missing2>)
+   (<missing1> == <missing2>)
+-->
+   (<s> ^operator <o> = <o2>)
+   (write |deliverLeaflet score/colors/missing tie| (crlf))}

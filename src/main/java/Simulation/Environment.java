@@ -30,9 +30,10 @@ public class Environment
         try {
         w = proxy.getWorld();
         w.reset();
-        c = proxy.createCreature(100,100,0,1);
+        c = proxy.createCreature(100,100,0,1); // POsiciona o agente
         c.start();
         w.grow(1);
+        w.createDeliverySpot(500.0,500.0);
 
         if (prepareEnviromentAndStartGame)
         {

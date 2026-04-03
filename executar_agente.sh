@@ -1,0 +1,1 @@
+unset LD_LIBRARY_PATH; LD_PRELOAD=/lib/x86_64-linux-gnu/libpthread.so.0 ./gradlew run
