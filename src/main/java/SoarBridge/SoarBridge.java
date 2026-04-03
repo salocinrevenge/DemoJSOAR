@@ -34,6 +34,25 @@ import ws3dproxy.util.Constants;
  *
  * @author Danilo Lucentini and Ricardo Gudwin
  */
+
+class MemoryItem {
+    String name;
+    String type;
+    double x, y;
+    int category;
+
+    MemoryItem(String name, String type, double x, double y) {
+        this.name = name;
+        this.type = type;
+        this.x = x;
+        this.y = y;
+        // Mapeia o texto de volta para a categoria do simulador
+        if (type.equals("FOOD")) this.category = Constants.categoryFOOD;
+        else if (type.equals("JEWEL")) this.category = Constants.categoryJEWEL;
+        else this.category = Constants.categoryBRICK;
+    }
+}
+
 public class SoarBridge
 {
     // Log Variable
@@ -49,11 +68,15 @@ public class SoarBridge
     Identifier creatureParameters;
     Identifier creaturePosition;
     Identifier creatureMemory;
+    Identifier creatureScanningItems;
     
     Environment env;
     public Creature c;
     public String input_link_string = "";
     public String output_link_string = "";
+
+    // Lista de memória persistente
+    private List<MemoryItem> persistentMemory = new ArrayList<MemoryItem>();
 
     /**
      * Constructor class
@@ -144,52 +167,74 @@ public class SoarBridge
         {
             if (agent != null)
             {
-              //SimulationCreature creatureParameter = (SimulationCreature)parameter;
-              // Initialize Creature Entity
-              creature = CreateIdWME(inputLink, "CREATURE");
-              // Initialize Creature Memory
-              creatureMemory = CreateIdWME(creature, "MEMORY");
-              // Set Creature Parameters
-              Calendar lCDateTime = Calendar.getInstance();
-              creatureParameters = CreateIdWME(creature, "PARAMETERS");
-              CreateFloatWME(creatureParameters, "MINFUEL", 400);
-              CreateFloatWME(creatureParameters, "TIMESTAMP", lCDateTime.getTimeInMillis());
-              // Setting creature Position
-              creaturePosition = CreateIdWME(creature, "POSITION");
-              CreateFloatWME(creaturePosition, "X", c.getPosition().getX());
-              CreateFloatWME(creaturePosition, "Y", c.getPosition().getY());
-              // Set creature sensors
-              creatureSensor = CreateIdWME(creature, "SENSOR");
-              // Create Fuel Sensors
-              Identifier fuel = CreateIdWME(creatureSensor, "FUEL");
-              CreateFloatWME(fuel, "VALUE",c.getFuel());
-              // Create Visual Sensors
-              Identifier visual = CreateIdWME(creatureSensor, "VISUAL");
-              List<Thing> thingsList = (List<Thing>) c.getThingsInVision();
-              for (Thing t : thingsList) 
+            //SimulationCreature creatureParameter = (SimulationCreature)parameter;
+            // Initialize Creature Entity
+            creature = CreateIdWME(inputLink, "CREATURE");
+            // Initialize Creature Scanning Items (for subgoaling)
+            creatureScanningItems = CreateIdWME(creature, "SCANNING-ITEMS");
+            CreateIdWME(creatureScanningItems, "JEWELS");
+            CreateIdWME(creatureScanningItems, "FOODS");
+            // Set Creature Parameters
+            Calendar lCDateTime = Calendar.getInstance();
+            creatureParameters = CreateIdWME(creature, "PARAMETERS");
+            CreateFloatWME(creatureParameters, "MINFUEL", 300);
+            CreateFloatWME(creatureParameters, "TIMESTAMP", lCDateTime.getTimeInMillis());
+            // Setting creature Position
+            creaturePosition = CreateIdWME(creature, "POSITION");
+            CreateFloatWME(creaturePosition, "X", c.getPosition().getX());
+            CreateFloatWME(creaturePosition, "Y", c.getPosition().getY());
+            // Set creature sensors
+            creatureSensor = CreateIdWME(creature, "SENSOR");
+            // Create Fuel Sensors
+            Identifier fuel = CreateIdWME(creatureSensor, "FUEL");
+            CreateFloatWME(fuel, "VALUE",c.getFuel());
+            // Create Visual Sensors
+            Identifier visual = CreateIdWME(creatureSensor, "VISUAL");
+            List<Thing> thingsList = (List<Thing>) c.getThingsInVision();
+            for (Thing t : thingsList) 
                 {
-                 Identifier entity = CreateIdWME(visual, "ENTITY");
-                 CreateFloatWME(entity, "DISTANCE", GetGeometricDistanceToCreature(t.getX1(),t.getY1(),t.getX2(),t.getY2(),c.getPosition().getX(),c.getPosition().getY()));                                                    
-                 CreateFloatWME(entity, "X", t.getX1());
-                 CreateFloatWME(entity, "Y", t.getY1());
-                 CreateFloatWME(entity, "X2", t.getX2());
-                 CreateFloatWME(entity, "Y2", t.getY2());
-                 CreateStringWME(entity, "TYPE", getItemType(t.getCategory()));
-                 CreateStringWME(entity, "NAME", t.getName());
-                 CreateStringWME(entity, "COLOR",Constants.getColorName(t.getMaterial().getColor()));                                                    
+                    Identifier entity = CreateIdWME(visual, "ENTITY");
+                    CreateFloatWME(entity, "DISTANCE", GetGeometricDistanceToCreature(t.getX1(),t.getY1(),t.getX2(),t.getY2(),c.getPosition().getX(),c.getPosition().getY()));                                                    
+                    CreateFloatWME(entity, "X", t.getX1());
+                CreateFloatWME(entity, "Y", t.getY1());
+                CreateFloatWME(entity, "X2", t.getX2());
+                CreateFloatWME(entity, "Y2", t.getY2());
+                CreateStringWME(entity, "TYPE", getItemType(t.getCategory()));
+                CreateStringWME(entity, "NAME", t.getName());
+                CreateStringWME(entity, "COLOR",Constants.getColorName(t.getMaterial().getColor()));               
+                // Adiciona o item visualmente percebido na memória persistente, para que o agente possa raciocinar sobre ele mesmo que não esteja mais visível posteriormente
+                boolean exists = false;
+                for(MemoryItem m : persistentMemory) {
+                    if(m.name.equals(t.getName())) { exists = true; break; }
                 }
+                if(!exists) {
+                    persistentMemory.add(new MemoryItem(t.getName(), getItemType(t.getCategory()), t.getX1(), t.getY1()));
+                }
+
             }
+            // Initialize Creature Memory
+            creatureMemory = CreateIdWME(creature, "MEMORY");
+            for (MemoryItem m : persistentMemory) {
+                Identifier entity = CreateIdWME(creatureMemory, "ENTITY");
+                CreateStringWME(entity, "TYPE", m.type);
+                CreateStringWME(entity, "NAME", m.name);
+                CreateFloatWME(entity, "X", m.x);
+                CreateFloatWME(entity, "Y", m.y);
+                System.out.println("Added to persistent memory: "+m.name+" of type "+m.type+" at position ("+m.x+","+m.y+")");
+            }
+            
         }
+    }
         catch (Exception e)
         {
             logger.severe("Error while Preparing Input Link");
             e.printStackTrace();
         }
     }
-
+    
     private double GetGeometricDistanceToCreature(double x1, double y1, double x2, double y2, double xCreature, double yCreature)
     {
-          float squared_dist = 0.0f;
+        float squared_dist = 0.0f;
           double maxX = Math.max(x1, x2);
           double minX = Math.min(x1, x2);
           double maxY = Math.max(y1, y2);
@@ -242,13 +287,15 @@ public class SoarBridge
         else return(6);
     }
 
-    private String GetParameterValue(String par) {
-        List<Wme> Commands = Wmes.matcher(agent).filter(agent.getInputOutput().getOutputLink());
-        List<Wme> Parameters = Wmes.matcher(agent).filter(Commands.get(0));
-        String parvalue = "";
-        for (Wme w : Parameters) 
-           if (w.getAttribute().toString().equals(par)) parvalue = w.getValue().toString();
-        return(parvalue);
+    private String GetParameterValue(Identifier commandId, String par) {
+        // Filtra os WMEs que estão "pendurados" dentro do ID do comando específico
+        List<Wme> Parameters = Wmes.matcher(agent).filter(commandId);
+        for (Wme w : Parameters) {
+            if (w.getAttribute().toString().equals(par)) {
+                return w.getValue().toString();
+            }
+        }
+        return ""; // Retorna vazio se não achar o parâmetro naquele comando
     }
     
     
@@ -271,20 +318,23 @@ public class SoarBridge
                     String name  = com.getAttribute().asString().getValue();
                     Command.CommandType commandType = Enum.valueOf(Command.CommandType.class, name);
                     Command command = null;
+                    Identifier comId = com.getValue().asIdentifier();
 
                     switch(commandType)
                     {
                         case MOVE:
+                            System.out.println("Processing MOVE command...");
                             Float rightVelocity = null;
                             Float leftVelocity = null;
                             Float linearVelocity = null;
                             Float xPosition = null;
                             Float yPosition = null;
-                            rightVelocity = tryParseFloat(GetParameterValue("VelR"));
-                            leftVelocity = tryParseFloat(GetParameterValue("VelL"));
-                            linearVelocity = tryParseFloat(GetParameterValue("Vel"));
-                            xPosition = tryParseFloat(GetParameterValue("X"));
-                            yPosition = tryParseFloat(GetParameterValue("Y"));
+                            System.out.println("Parameters received from SOAR: VelR="+GetParameterValue(comId, "VelR")+" VelL="+GetParameterValue(comId, "VelL")+" Vel="+GetParameterValue(comId, "Vel")+" X="+GetParameterValue(comId, "X")+" Y="+GetParameterValue(comId, "Y") + " Identifier: "+comId.toString());
+                            rightVelocity = tryParseFloat(GetParameterValue(comId, "VelR"));
+                            leftVelocity = tryParseFloat(GetParameterValue(comId, "VelL"));
+                            linearVelocity = tryParseFloat(GetParameterValue(comId, "Vel"));
+                            xPosition = tryParseFloat(GetParameterValue(comId, "X"));
+                            yPosition = tryParseFloat(GetParameterValue(comId, "Y"));
                             command = new Command(Command.CommandType.MOVE);
                             CommandMove commandMove = (CommandMove)command.getCommandArgument();
                             if (commandMove != null)
@@ -300,6 +350,7 @@ public class SoarBridge
                             {
                                 logger.severe("Error processing MOVE command");
                             }
+                            System.out.println("Processed MOVE command with parameters: VelR="+rightVelocity+" VelL="+leftVelocity+" Vel="+linearVelocity+" X="+xPosition+" Y="+yPosition);
                             break;
 
                         case GET:
@@ -308,7 +359,7 @@ public class SoarBridge
                             CommandGet commandGet = (CommandGet)command.getCommandArgument();
                             if (commandGet != null)
                             {
-                                thingNameToGet = GetParameterValue("Name");
+                                thingNameToGet = GetParameterValue(comId, "Name");
                                 if (thingNameToGet != null) commandGet.setThingName(thingNameToGet);
                                 commandList.add(command);
                             }
@@ -320,7 +371,7 @@ public class SoarBridge
                             CommandEat commandEat = (CommandEat)command.getCommandArgument();
                             if (commandEat != null)
                             {
-                                thingNameToEat = GetParameterValue("Name");
+                                thingNameToEat = GetParameterValue(comId, "Name");
                                 if (thingNameToEat != null) commandEat.setThingName(thingNameToEat);
                                 commandList.add(command);
                             }
@@ -329,7 +380,9 @@ public class SoarBridge
                         default:
                             break;
                     }   
+
                 }
+
             }
         }
         catch (Exception e)
@@ -426,24 +479,20 @@ public class SoarBridge
      * Send Move Command to World Server
      * @param soarCommandMove Soar Move Command Structure
      */
-    private void processMoveCommand(CommandMove soarCommandMove) throws CommandExecException
-    {
-        if (soarCommandMove != null)
-        {
-            if (soarCommandMove.getX() != null && soarCommandMove.getY() != null)
-            {
-                CommandUtility.sendGoTo("0", soarCommandMove.getRightVelocity(), soarCommandMove.getLeftVelocity(), soarCommandMove.getX(), soarCommandMove.getY());
-            }
-            else
-            {
-                CommandUtility.sendSetTurn("0",soarCommandMove.getLinearVelocity(),soarCommandMove.getRightVelocity(),soarCommandMove.getLeftVelocity());
-            }
-        }
-        else
-        {
-            logger.severe("Error processing processMoveCommand");
+    private void processMoveCommand(CommandMove soarCommandMove) throws CommandExecException {
+    if (soarCommandMove != null) {
+        // Use valores padrão (0) caso o Soar não envie algum parâmetro
+        float vR = (soarCommandMove.getRightVelocity() != null) ? soarCommandMove.getRightVelocity() : 0.0f;
+        float vL = (soarCommandMove.getLeftVelocity() != null) ? soarCommandMove.getLeftVelocity() : 0.0f;
+        float vLinear = (soarCommandMove.getLinearVelocity() != null) ? soarCommandMove.getLinearVelocity() : 0.0f;
+
+        if (soarCommandMove.getX() != null && soarCommandMove.getY() != null) {
+            CommandUtility.sendGoTo("0", vR, vL, soarCommandMove.getX(), soarCommandMove.getY());
+        } else {
+            CommandUtility.sendSetTurn("0", vLinear, vR, vL);
         }
     }
+}
 
     /**
      * Send Get Command to World Server
@@ -453,7 +502,10 @@ public class SoarBridge
     {
         if (soarCommandGet != null)
         {
-            c.putInSack(soarCommandGet.getThingName());
+            String name = soarCommandGet.getThingName();
+            c.putInSack(name);
+            persistentMemory.removeIf(m -> m.name.equals(name));
+
         }
         else
         {
@@ -469,7 +521,9 @@ public class SoarBridge
     {
         if (soarCommandEat != null)
         {
-            c.eatIt(soarCommandEat.getThingName());
+            String name = soarCommandEat.getThingName();
+            c.eatIt(name);
+            persistentMemory.removeIf(m -> m.name.equals(name));
         }
         else
         {

@@ -1,0 +1,311 @@
+╔══════════════════════════════════════════════════════════════════════════════╗
+║                 SISTEMA DE SUBGOALING - DIAGRAMAS VISUAIS                     ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+═══════════════════════════════════════════════════════════════════════════════
+                        DIAGRAMA 1: FLUXO DE DECISÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+                            ┌─────────────────────┐
+                            │  INICIAR CICLO SOAR │
+                            └──────────┬──────────┘
+                                       │
+                                       ▼
+                          ┌────────────────────────────┐
+                          │ LER VALORES DO SENSOR      │
+                          │ - fuel-level               │
+                          │ - visual entities          │
+                          └──────────┬─────────────────┘
+                                     │
+                                     ▼
+                    ┌────────────────────────────────────────┐
+                    │   VERIFICAR CONDIÇÕES                  │
+                    │                                        │
+                    │   1. combustível >= 300?              │
+                    │   2. há jóias em SCANNING-ITEMS?      │
+                    │   3. há comidas em SCANNING-ITEMS?    │
+                    └────────────┬───────────────────────────┘
+                                 │
+                ┌────────────────┼────────────────┐
+                │                │                │
+                ▼                ▼                ▼
+        ┌─────────────┐  ┌──────────────┐  ┌──────────────┐
+        │ GET-JEWEL?  │  │ EAT-FOOD?    │  │ WANDER (def) │
+        │ P=10        │  │ P=9          │  │ P=1          │
+        └──────┬──────┘  └──────┬───────┘  └──────┬───────┘
+               │                │                 │
+               │ SIM            │ SIM              │ SEMPRE
+               │                │                 │
+               ▼                ▼                 ▼
+          ┌──────────┐      ┌──────────┐    ┌──────────┐
+          │BEM-VINDO:│      │BEM-VINDO:│    │ GIRAR:   │
+          │GET-JEWEL │      │EAT-FOOD  │    │ESCANEAR  │
+          └────┬─────┘      └────┬─────┘    └────┬─────┘
+               │                 │              │
+               ▼                 ▼              ▼
+          BUSCAR JÓIA        BUSCAR COMIDA   ARMAZENAR
+          MAIS PRÓXIMA       MAIS PRÓXIMA    ITENS EM
+          EM MEMÓRIA         EM MEMÓRIA      MEMÓRIA
+
+═══════════════════════════════════════════════════════════════════════════════
+                      DIAGRAMA 2: ESTRUTURA DE MEMÓRIA
+═══════════════════════════════════════════════════════════════════════════════
+
+INPUT-LINK
+│
+└─ CREATURE
+   │
+   ├─ SENSOR
+   │  ├─ FUEL
+   │  │  └─ VALUE: 500.0
+   │  │
+   │  └─ VISUAL
+   │     ├─ ENTITY[0]
+   │     │  ├─ TYPE: "JEWEL"
+   │     │  ├─ NAME: "JEWEL_1"
+   │     │  ├─ X: 150.0
+   │     │  ├─ Y: 200.0
+   │     │  ├─ DISTANCE: 45.2
+   │     │  └─ COLOR: "red"
+   │     │
+   │     └─ ENTITY[1]
+   │        ├─ TYPE: "FOOD"
+   │        ├─ NAME: "FOOD_1"
+   │        ├─ X: 300.0
+   │        ├─ Y: 50.0
+   │        ├─ DISTANCE: 212.0
+   │        └─ COLOR: "green"
+   │
+   ├─ POSITION
+   │  ├─ X: 100.0
+   │  └─ Y: 100.0
+   │
+   ├─ PARAMETERS
+   │  ├─ MINFUEL: 400
+   │  └─ TIMESTAMP: 1234567890
+   │
+   ├─ MEMORY
+   │  └─ (estrutura anterior - vazia ou com dados históricos)
+   │
+   └─ SCANNING-ITEMS ⭐ NOVO
+      │
+      ├─ JEWELS
+      │  └─ list
+      │     └─ ITEM[0]
+      │        ├─ item-name: "JEWEL_1"
+      │        ├─ item-x: 150.0
+      │        ├─ item-y: 200.0
+      │        └─ item-color: "red"
+      │
+      └─ FOODS
+         └─ list
+            └─ ITEM[0]
+               ├─ item-name: "FOOD_1"
+               ├─ item-x: 300.0
+               ├─ item-y: 50.0
+               └─ item-color: "green"
+
+═══════════════════════════════════════════════════════════════════════════════
+                    DIAGRAMA 3: MÁQUINA DE ESTADOS
+═══════════════════════════════════════════════════════════════════════════════
+
+                              ┌──────────┐
+                              │  WANDER  │
+                              │(Scanning)│
+                              └────┬─────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    │              │              │
+         ┌──────────▼──────┐     ├─▼──┤     ┌─────▼────────┐
+         │ Encontra Jóia  │     │ ... │     │Encontra Food │
+         │ (armazena)     │     │ ... │     │ (armazena)   │
+         └──────────┬──────┘     │ ... │     └─────┬────────┘
+                    │            │ ... │           │
+        ┌───────────▼──────────┐ │ ... │ ┌────────▼──────────┐
+        │ Próximo Ciclo:       │ │ ... │ │ Próximo Ciclo:    │
+        │ fuel >= 300?         │ │ ... │ │ fuel < 300?       │
+        │                      │ │ ... │ │                   │
+        │ SIM: GET-JEWEL ─────────┐   │ SIM: EAT-FOOD ────┐ │
+        │ NÃO: WANDER ───────┐    │   │ NÃO: WANDER ───┐ │ │
+        └────────────────────┼────┼───┼────────────────┼─┘─┘
+                             │    │   │                │
+                    ┌────────▼────┴───┴────────┐       │
+                    │                          │       │
+                    └──────────────┬───────────┘       │
+                                   ▼                    │
+                    ┌─────────────────────────┐        │
+                    │   GET-JEWEL STATE       │        │
+                    │ (Move → Pegar Jóia)    │        │
+                    │ Prioridade: 10         │        │
+                    └──────────┬──────────────┘        │
+                               │                       │
+                               │ Jóia pega ou         │
+                               │ combustível baixo    │
+                               │                      │
+                               ▼                      ▼
+                    ┌────────────────────┐ ┌────────────────────┐
+                    │   EAT-FOOD STATE   │ │   EAT-FOOD STATE   │
+                    │(Move → Comer)      │ │ (Move → Comer)     │
+                    │Prioridade: 9       │ │ Prioridade: 9      │
+                    └────────────────────┘ └────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                      DIAGRAMA 4: EXEMPLO DE EXECUÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+CICLOS 1-50: EXPLORAÇÃO INICIAL
+┌────────────────────────────────────────────────────────────────┐
+│ WANDER (girando constantemente)                               │
+│ ┌──────────────────────────────────────────────────────────┐  │
+│ │ Ciclo 1:  Fuel=500  Visual=[  ]  Found=                 │  │
+│ │ Ciclo 5:  Fuel=495  Visual=[JEWEL]  Found=JEWEL_1  ✓   │  │
+│ │ Ciclo 10: Fuel=490  Visual=[  ]  Found=JEWEL_1          │  │
+│ │ Ciclo 15: Fuel=485  Visual=[FOOD]  Found=JEWEL_1, FOOD_1✓│
+│ │ Ciclo 20: Fuel=480  Visual=[  ]  Found=JEWEL_1, FOOD_1  │  │
+│ │ ...                                                        │  │
+│ │ Ciclo 50: Fuel=450  Visual=[JEWEL]  Found=J1, F1, J2  ✓ │  │
+│ └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│ SCANNING-ITEMS:                                              │
+│ ├─ JEWELS: [JEWEL_1(150,200), JEWEL_2(200,100)]             │
+│ └─ FOODS: [FOOD_1(300,50)]                                  │
+└────────────────────────────────────────────────────────────────┘
+
+CICLOS 51-100: PRIMEIRA BUSCA (combustível alto)
+┌────────────────────────────────────────────────────────────────┐
+│ GET-JEWEL (maior prioridade porque fuel >= 300)               │
+│ Alvo: JEWEL_2 em (200, 100) [mais próxima]                  │
+│ ┌──────────────────────────────────────────────────────────┐  │
+│ │ Ciclo 51: Distance=200  →  MOVE(200, 100)               │  │
+│ │ Ciclo 60: Distance=100  →  MOVE(200, 100)               │  │
+│ │ Ciclo 70: Distance=40   →  MOVE(200, 100)               │  │
+│ │ Ciclo 75: Distance=25   → EXECUTAR GET(JEWEL_2)  ✓✓✓   │  │
+│ │ Ciclo 76: Fuel=400 (consumo durante busca)             │  │
+│ └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│ SCANNING-ITEMS:                                              │
+│ ├─ JEWELS: [JEWEL_1(150,200), JEWEL_2(200,100) REMOVIDO]   │
+│ └─ FOODS: [FOOD_1(300,50)]                                 │
+└────────────────────────────────────────────────────────────────┘
+
+CICLOS 101-150: CONTINUE WANDER OU PRÓXIMO ALVO
+┌────────────────────────────────────────────────────────────────┐
+│ Combustível: 400                                              │
+│ Condição: fuel >= 300? SIM                                   │
+│ Items em memória? Sim: JEWEL_1                               │
+│ Ação: GET-JEWEL (nova busca por JEWEL_1)                    │
+│ ┌──────────────────────────────────────────────────────────┐  │
+│ │ Ciclo 101: Distance=150 → MOVE(150, 200)                │  │
+│ │ ...                                                        │  │
+│ │ Ciclo 120: Distance=25  → EXECUTAR GET(JEWEL_1)   ✓✓✓   │  │
+│ │ Ciclo 121: Fuel=350 + SCANNING-ITEMS.JEWELS agora []   │  │
+│ └──────────────────────────────────────────────────────────┘  │
+└────────────────────────────────────────────────────────────────┘
+
+CICLOS 200+: COMBUSTÍVEL BAIXO
+┌────────────────────────────────────────────────────────────────┐
+│ Combustível: 240 (< 300)                                      │
+│ Condição: fuel < 300? SIM E há comidas? SIM                 │
+│ Ação: EAT-FOOD (muda de prioridade)                         │
+│ ┌──────────────────────────────────────────────────────────┐  │
+│ │ Ciclo 200: Distance=212 → MOVE(300, 50)                 │  │
+│ │ Ciclo 220: Distance=50  → MOVE(300, 50)                 │  │
+│ │ Ciclo 235: Distance=25  → EXECUTAR EAT(FOOD_1)   ✓✓✓   │  │
+│ │ Ciclo 236: Fuel=290 (COMIDO!)                           │  │
+│ │ Ciclo 237: WANDER (explorar por mais comida/jóia)       │  │
+│ └──────────────────────────────────────────────────────────┘  │
+│                                                                │
+│ SCANNING-ITEMS:                                              │
+│ ├─ JEWELS: [] (todas coletadas)                             │
+│ └─ FOODS: [] (FOOD_1 comida)                               │
+└────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                     DIAGRAMA 5: PRIORIDADES EM AÇÃO
+═══════════════════════════════════════════════════════════════════════════════
+
+PASSO 1: Checar disponível
+┌──────────────────────────────────┐
+│ Operadores Propostos:            │
+│                                  │
+│ ✓ WANDER           (Prioridade 1)│
+│ ✓ GET-JEWEL        (Prioridade 10)
+│ ✓ EAT-FOOD         (Prioridade 9)│
+└──────────────────────────────────┘
+
+PASSO 2: Filtrar por condições
+┌──────────────────────────────────┐
+│ Condições Satisfeitas:           │
+│                                  │
+│ ✓ WANDER           (sempre)      │
+│ ✓ GET-JEWEL        (fuel≥300 ✓)  │
+│ ✗ EAT-FOOD         (fuel<300 ✗)  │
+└──────────────────────────────────┘
+
+PASSO 3: Selecionar melhor
+┌──────────────────────────────────┐
+│ Operador Selecionado:            │
+│                                  │
+│ 👑 GET-JEWEL (Prioridade 10)     │
+│    ↑ Maior prioridade!!          │
+└──────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                   DIAGRAMA 6: ESTRUTURA DE DADOS NO JAVA
+═══════════════════════════════════════════════════════════════════════════════
+
+SoarBridge.java:
+┌─────────────────────────────────────────────────────────┐
+│ public class SoarBridge                                 │
+│ {                                                       │
+│     // Variáveis existentes:                           │
+│     Identifier creature;                                │
+│     Identifier creatureSensor;                          │
+│     Identifier creatureParameters;                      │
+│     Identifier creaturePosition;                        │
+│     Identifier creatureMemory;                          │
+│                                                         │
+│     // NOVA VARIÁVEL (adicionada):                     │
+│     ► Identifier creatureScanningItems;  ◄─ AQUI!     │
+│                                                         │
+│     public void prepareInputLink()                       │
+│     {                                                   │
+│         // ... código existente ...                    │
+│                                                         │
+│         // NOVA INICIALIZAÇÃO (adicionada):            │
+│         ► creatureScanningItems = CreateIdWME(         │
+│           creature, "SCANNING-ITEMS");  ◄─ AQUI!      │
+│         ► Identifier scannedJewels = CreateIdWME(      │
+│           creatureScanningItems, "JEWELS");            │
+│         ► Identifier scannedFoods = CreateIdWME(       │
+│           creatureScanningItems, "FOODS");             │
+│     }                                                   │
+│ }                                                       │
+└─────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                        RESUMO VISUAL FINAL
+═══════════════════════════════════════════════════════════════════════════════
+
+┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃                    SISTEMA FUNCIONANDO                           ┃
+┃                                                                  ┃
+┃   3 OPERADORES + 1 MEMÓRIA = SUBGOALING COMPLETO               ┃
+┃                                                                  ┃
+┃   ┌─────────────────────────────────────────────────────────┐  ┃
+┃   │ WANDER          EAT-FOOD       GET-JEWEL   SCANNING    │  ┃
+┃   │ (Prioridade 1)  (Prioridade 9) (Prioridade 10) ITEMS   │  ┃
+┃   │                                                         │  ┃
+┃   │ Gira e         Move para       Move para            │  ┃
+┃   │ escaneia       comida mais    jóia mais        Persiste│  ┃
+┃   │               próxima e come  próxima e pega   entre   │  ┃
+┃   │                                                ciclos   │  ┃
+┃   │ Armazena items  Combustível    Combustível             │  ┃
+┃   │ em memória     < 300            >= 300                 │  ┃
+┃   │                                                         │  ┃
+┃   └─────────────────────────────────────────────────────────┘  ┃
+┃                                                                  ┃
+┃   ✅ PRONTO PARA USO!                                           ┃
+┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛
+
+═══════════════════════════════════════════════════════════════════════════════

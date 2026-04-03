@@ -26,7 +26,7 @@ public class CommandMove
     /**
      * @return the rightVelocity
      */
-    public float getRightVelocity()
+    public Float getRightVelocity()
     {
         return rightVelocity;
     }
@@ -34,7 +34,7 @@ public class CommandMove
     /**
      * @param rightVelocity the rightVelocity to set
      */
-    public void setRightVelocity(float rightVelocity)
+    public void setRightVelocity(Float rightVelocity)
     {
         this.rightVelocity = rightVelocity;
     }
@@ -42,7 +42,7 @@ public class CommandMove
     /**
      * @return the leftVelocity
      */
-    public float getLeftVelocity()
+    public Float getLeftVelocity()
     {
         return leftVelocity;
     }
@@ -50,7 +50,7 @@ public class CommandMove
     /**
      * @param leftVelocity the leftVelocity to set
      */
-    public void setLeftVelocity(float leftVelocity)
+    public void setLeftVelocity(Float leftVelocity)
     {
         this.leftVelocity = leftVelocity;
     }
@@ -58,7 +58,7 @@ public class CommandMove
     /**
      * @return the wheel
      */
-    public float getLinearVelocity()
+    public Float getLinearVelocity()
     {
         return linearVelocity;
     }
@@ -66,7 +66,7 @@ public class CommandMove
     /**
      * @param wheel the wheel to set
      */
-    public void setLinearVelocity(float linearVelocity)
+    public void setLinearVelocity(Float linearVelocity)
     {
         this.linearVelocity = linearVelocity;
     }

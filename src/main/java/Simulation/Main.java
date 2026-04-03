@@ -29,8 +29,8 @@ public class Main
         SilenceLoggers();
         try
         {
-            NativeUtils.loadFileFromJar("/rules/soar-rules.soar");
-            String soarRulesPath = "soar-rules.soar";
+            NativeUtils.loadFileFromJar("/rules/soar-rules-ativ1.soar");
+            String soarRulesPath = "soar-rules-ativ1.soar";
 
             //Start enviroment data
             Environment e = new Environment(Boolean.FALSE);
@@ -49,7 +49,7 @@ public class Main
                    mv.set_output_link_text(soarBridge.output_link_string);
                 }
                 else e.c.updateState();
-                Thread.sleep(100);                   
+                Thread.sleep(100);
             }
         }
         catch (Exception ex)

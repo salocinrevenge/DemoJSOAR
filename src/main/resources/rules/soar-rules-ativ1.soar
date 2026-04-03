@@ -1,0 +1,176 @@
+################################  CONFIGURATION ################################
+watch 5
+learn --off
+epmem --set learning off 
+#smem --off
+
+###################################  WANDER  ###################################
+# Operador de menor prioridade: explorar o ambiente
+sp {propose*wander
+   (state <s> ^io.input-link <il>)
+-->
+   (<s> ^operator <o> + <) # Pessimistic preference
+   (<o> ^name wander)
+   (write |Wander |(crlf))}
+
+sp {apply*wander
+   (state <s> ^operator <o>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<o> ^name wander)
+   
+-->
+   (<ol> ^MOVE <command>)
+   (<command> ^Vel 0)
+   (<command> ^VelR 2)
+   (<command> ^VelL 0)
+   (write |Wandering |(crlf))}
+
+
+##########################  SUBGOAL PROPOSITION (STATE) ########################
+
+# Se fuel < 300 e existe comida na MEMORY do Java, propõe subestado de fome
+sp {propose*goal*getFood
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <c>)
+   (<c> ^SENSOR.FUEL.VALUE < 300)
+   (<c> ^MEMORY.ENTITY <e>)
+   (<e> ^TYPE FOOD)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name goalGetFood)
+   (write |Lets get food |(crlf))}
+
+# Se fuel >= 300 e existe joia na MEMORY do Java, propõe subestado de coletar joia
+sp {propose*goal*getJewel
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <c>)
+   (<c> ^SENSOR.FUEL.VALUE >= 300)
+   (<c> ^MEMORY.ENTITY <e>)
+   (<e> ^TYPE JEWEL)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name goalGetJewel)
+   (write |Lets get Jewel |(crlf))}
+
+###########################  SUBGOAL: GET FOOD  ################################
+
+# No subestado de comida, se houver uma comida na memória, move-se para ela
+sp {goalGetFood*propose*moveFood
+   (state <s> ^superstate <ss>)
+   (<ss> ^operator <so> ^io.input-link.CREATURE <creature>)
+   (<so> ^name goalGetFood)
+   (<creature> ^MEMORY.ENTITY <e> ^POSITION <pos>)
+   (<e> ^TYPE FOOD ^X <ex> ^Y <ey> ^NAME <ename>)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name moveFood
+        ^parameter <p>)
+   (<p> ^X <ex> ^Y <ey> ^NAME <ename>)
+   (write |Lets move to food |(crlf))}
+
+###########################  SUBGOAL: GET JEWEL ################################
+
+
+
+# No subestado de joia, se houver uma joia na memória, move-se para ela
+sp {goalGetJewel*propose*moveJewel
+   (state <s> ^superstate <ss>)
+   (<ss> ^operator <so> ^io.input-link.CREATURE <creature>)
+   (<so> ^name goalGetJewel)
+   (<creature> ^MEMORY.ENTITY <e> ^POSITION <pos>)
+   (<e> ^TYPE JEWEL ^X <ex> ^Y <ey> ^NAME <ename>)
+   (<pos> ^X <px> ^Y <py>)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name moveJewel
+        ^parameter <p>)
+   (<p> ^X <ex> ^Y <ey> ^NAME <ename>)
+   (write |Lets move to Jewel |(crlf))}
+
+##########################  ATOMIC ACTIONS (TOP STATE) #########################
+# Estas regras agem quando o objeto está PERTO (visto pelo sensor visual, não memória)
+
+# Ação Real: Comer (Só se fuel < 300)
+sp {propose*eatFood*immediate
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <c>)
+   (<c> ^SENSOR.FUEL.VALUE < 300)
+   (<c> ^SENSOR.VISUAL.ENTITY <e>)
+   (<e> ^TYPE FOOD ^DISTANCE < 30 ^NAME <name>)
+-->
+   (<s> ^operator <o> + >)
+   (<o> ^name eatFood ^NAME <name>)
+   (write |Let Eat foooood |(crlf))}
+
+# Ação Real: Pegar Joia (Sempre que estiver perto e em "modo joia" ou fuel ok)
+sp {propose*getJewel*immediate
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <c>)
+   (<c> ^SENSOR.FUEL.VALUE >= 300)
+   (<c> ^SENSOR.VISUAL.ENTITY <e>)
+   (<e> ^TYPE JEWEL ^DISTANCE < 30 ^NAME <name>)
+-->
+   (<s> ^operator <o> + >)
+   (<o> ^name getJewel ^NAME <name>)
+   (write |Let Get jewelll :D |(crlf))}
+
+#################################  APPLICATIONS ################################
+
+sp {apply*moveGeneric*this-state
+   (state <s> ^operator <o> ^io.output-link <ol>)
+   (<o> ^name << moveFood moveJewel >> ^parameter <p>)
+-->
+   (<ol> ^MOVE <m>)
+   (<m> ^Vel 1 ^VelR 1 ^VelL 1 ^X <p.X> ^Y <p.Y>)
+   (write |moving, wyyyhoo |(crlf))}
+
+sp {apply*moveGeneric*above-state
+   (state <s> ^superstate <ss> ^operator <o> ^superstate.io.output-link <ol>)
+   (<o> ^name << moveFood moveJewel >> ^parameter <p>)
+   (<p> ^X <px> ^Y <py>)
+
+-->
+   (<ol> ^MOVE <m>)
+   (<m> ^Vel 1 ^VelR 1 ^VelL 1 ^X <px> ^Y <py>)
+   (write |moving above, wyyyhoo |(crlf))}
+
+sp {apply*eatFood
+   (state <s> ^operator <o> ^io.output-link <ol>)
+   (<o> ^name eatFood ^NAME <n>)
+-->
+   (<ol> ^EAT <e>)
+   (<e> ^Name <n>)
+   (write |Eat now |(crlf))}
+
+sp {apply*getJewel
+   (state <s> ^operator <o> ^io.output-link <ol>)
+   (<o> ^name getJewel ^NAME <n>)
+-->
+   (<ol> ^GET <g>)
+   (<g> ^Name <n>)
+   (write |Get now |(crlf))}
+
+###################################  AVOID  ####################################
+sp {propose*avoidBrick
+   (state <s> ^io.input-link.CREATURE.SENSOR.VISUAL.ENTITY <e>)
+   (<e> ^TYPE BRICK ^DISTANCE <d> <= 61)
+-->
+   (<s> ^operator <o> + >)
+   (<o> ^name avoidBrick ^distance <d>)}
+
+sp {apply*avoidBrick
+   (state <s> ^operator <o> ^io.output-link <ol>)
+   (<o> ^name avoidBrick ^distance <d>)
+-->
+   (<ol> ^MOVE <m>)
+   (<m> ^Vel 0 ^VelR (/ 55 <d>) ^VelL 0)}
+
+####################################  HALT  ####################################
+sp {report*command
+   (state <s> ^io.output-link <ol>)
+   (<ol> ^<attr> <val>)
+-->
+   (write |Command issued: | <attr> (crlf))
+   # Removi o (interrupt) daqui
+}
