@@ -131,6 +131,12 @@ public class SoarBridge
             case Constants.categoryCREATURE:
                 itemType = "CREATURE";
                 break;
+            case Constants.categoryDeliverySPOT:
+                itemType = "DELIVERYSPOT";
+                break;
+            default:
+                itemType = "UNKNOWN";
+                break;
         }
         return itemType;
     }
@@ -178,7 +184,14 @@ public class SoarBridge
                  CreateFloatWME(entity, "Y", t.getY1());
                  CreateFloatWME(entity, "X2", t.getX2());
                  CreateFloatWME(entity, "Y2", t.getY2());
+                 try{
                  CreateStringWME(entity, "TYPE", getItemType(t.getCategory()));
+                 }
+                 catch (Exception e)
+                 {
+                     logger.severe("Error while setting TYPE WME for entity "+t.getName());
+                     CreateStringWME(entity, "TYPE", "UNKNOWN");
+                 }
                  CreateStringWME(entity, "NAME", t.getName());
                  CreateStringWME(entity, "COLOR",Constants.getColorName(t.getMaterial().getColor())); 
                  // Adciiona na memória se ainda não estiver
@@ -213,7 +226,9 @@ public class SoarBridge
                 //Compara o saco com cada leaflet e computa quanto falta para cada um, depois soma 1 em todos e divide pela pontuação.
                 // O Soar usa esses valores para desempatar e decidir qual leaflet priorizar.
                 List<ws3dproxy.model.Leaflet> leaflets = c.getLeaflets();
+                c.updateBag() ;
                 ws3dproxy.model.Bag bag = c.getBag();
+                System.out.println(bag.printBag());
                 if (leaflets != null && !leaflets.isEmpty())
                 {
                     Identifier leafletsWme = CreateIdWME(creature, "LEAFLETS");
@@ -236,6 +251,7 @@ public class SoarBridge
                             int inBag = (bag != null) ? bag.getNumberCrystalPerType(color) : 0;
                             int missing = Math.max(required - inBag, 0);
 
+                            System.out.println("Leaflet ID: " + leaflet.getID() + ", Color: " + color + ", Required: " + required + ", In Bag: " + inBag + ", Missing: " + missing);
                             if (missing > 0)
                             {
                                 Identifier missingWme = CreateIdWME(leafletWme, "MISSING_COLOR");
