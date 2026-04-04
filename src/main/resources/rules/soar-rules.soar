@@ -386,6 +386,36 @@ sp {pref*eatFood*eatFood-equals
 
 # FOOD vs JEWEL
 
+# Eat Food vs Get Jewel - if fuel is above minimum, getJewel wins
+sp {pref*eatFood*getJewel*getJewelWins
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name getJewel)
+(<o2> ^name eatFood)
+(<s> ^io.input-link <il>)
+(<il> ^CREATURE.SENSOR.FUEL <fuel>)
+(<fuel> ^VALUE <value>)
+(<il> ^CREATURE.PARAMETERS.MINFUEL <threshold>)
+(<value> > <threshold>)
+-->
+(<s> ^operator <o> > <o2>)
+(write |getJewel vs eatFood | <value> | higher than | <threshold> (crlf) )}
+
+# Eat Food vs Get Jewel - if fuel is not above minimum, eatFood wins
+sp {pref*eatFood*getJewel*eatFoodWins
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name eatFood)
+(<o2> ^name getJewel)
+(<s> ^io.input-link <il>)
+(<il> ^CREATURE.SENSOR.FUEL <fuel>)
+(<fuel> ^VALUE <value>)
+(<il> ^CREATURE.PARAMETERS.MINFUEL <threshold>)
+(<value> <= <threshold>)
+-->
+(<s> ^operator <o> > <o2>)
+(write |eatFood vs getJewel | <value> | lower or equal to | <threshold> (crlf) )}
+
 # Move Food vs Move Jewel Preferences - Move Food Wins
 sp {pref*moveFood*moveJewel*moveFoodWins
 (state <s> ^operator <o> + 
@@ -476,6 +506,58 @@ sp {halt*condition
 
 #############################  DELIVER LEAFLET  ################################
 
+# Move toward the delivery spot while it is still far away.
+sp {propose*move*deliverySpot
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR.VISUAL <memory>)
+   (<memory> ^ENTITY <entityInMemory>)
+   (<creature> ^POSITION <creaturePosition>)
+   (<creaturePosition> ^X <creaturePositionX>)
+   (<creaturePosition> ^Y <creaturePositionY>)
+   (<entityInMemory> ^TYPE DELIVERYSPOT)
+   (<entityInMemory> ^X <entityInMemoryPositionX>)
+   (<entityInMemory> ^Y <entityInMemoryPositionY>)
+   (<entityInMemory> ^NAME <entityInMemoryName>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletId>)
+   (<leaflet> ^MISSING <missing> 0.0)
+   (<creature> ^SENSOR.VISUAL.ENTITY <deliverySpotKnown>)
+   (<deliverySpotKnown> ^TYPE DELIVERYSPOT)
+   (<deliverySpotKnown> ^DISTANCE <deliveryDistanceKnown> >= 30)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name moveDeliverySpot)
+   (<o> ^parameter <deliverySpot>)
+   (<deliverySpot> ^distance (sqrt (+ (* (- <creaturePositionX> <entityInMemoryPositionX>) (- <creaturePositionX> <entityInMemoryPositionX>)) (* (- <creaturePositionY> <entityInMemoryPositionY>) (- <creaturePositionY> <entityInMemoryPositionY>)))))
+   (<deliverySpot> ^X <entityInMemoryPositionX>)
+   (<deliverySpot> ^Y <entityInMemoryPositionY>)
+   (<deliverySpot> ^NAME <entityInMemoryName>)}
+
+# Apply*move*deliverySpot:
+sp {apply*move*deliverySpot
+   (state <s> ^operator <o>
+              ^io <io>)
+   (<io> ^input-link <il>)
+   (<io> ^output-link <ol>)
+   (<o> ^name moveDeliverySpot)
+   (<o> ^parameter <deliverySpot>)
+   (<deliverySpot> ^X <x>)
+   (<deliverySpot> ^Y <y>)
+   (<deliverySpot> ^NAME <entityInMemoryName>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR.VISUAL <memory>)
+   (<memory> ^ENTITY <entityInMemory>)
+   (<entityInMemory> ^NAME <entityInMemoryName>)
+-->
+   (<ol> ^MOVE <command>)
+   (<command> ^Vel 1)
+   (<command> ^VelR 1)
+   (<command> ^VelL 1)
+   (<command> ^X <x>)
+   (<command> ^Y <y>)}
+
 # Propose*deliver*leaflet:
 sp {propose*deliver*leaflet
    (state <s> ^io.input-link <il>)
@@ -484,6 +566,9 @@ sp {propose*deliver*leaflet
    (<leaflets> ^LEAFLET <leaflet>)
    (<leaflet> ^ID <leafletId>)
    (<leaflet> ^MISSING <missing> 0.0)
+   (<creature> ^SENSOR.VISUAL.ENTITY <deliverySpot>)
+   (<deliverySpot> ^TYPE DELIVERYSPOT)
+   (<deliverySpot> ^DISTANCE <deliveryDistance> < 30)
 -->
    (<s> ^operator <o> +)
    (<o> ^name deliverLeaflet)
@@ -498,12 +583,21 @@ sp {apply*deliver*leaflet
    (<o> ^name deliverLeaflet)
    (<o> ^parameter <leaflet>)
    (<leaflet> ^ID <leafletId>)
-   (<leaflet> ^MISSING 0.0)
    - (<ol> ^DELIVER <anything>)
 -->
    (<ol> ^DELIVER <command>)
    (<command> ^ID <leafletId>)
 }
+
+# If two moveDeliverySpot operators are proposed, choose any one of them.
+sp {pref*moveDeliverySpot*moveDeliverySpot
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name moveDeliverySpot)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs moveDeliverySpot | choose any one | (crlf))}
 
 # Prefer leaflets with the smallest score.
 sp {pref*deliverLeaflet*deliverLeaflet*less*score
@@ -599,16 +693,58 @@ sp {pref*deliverLeaflet*movingJewel
 (<s> ^operator <o> > <o2>)
 (write |deliverLeaflet vs moveJewel - deliverLeaflet wins| (crlf))}
 
-# If fuel is grater than PARAMETERS.MINFUEL, prefer delivering leaflet over moving food
+# When delivery is possible, prefer delivering the leaflet over moving food.
 sp {pref*deliverLeaflet*moveFood
 (state <s> ^operator <o> +
                      <o2> +)
 (<o> ^name deliverLeaflet)
 (<o2> ^name moveFood)
-(<s> ^io.input-link <il>)
-(<il> ^CREATURE.SENSOR.FUEL <fuel>)
-(<fuel> ^VALUE <value> > <threshold>)
-(<o2> ^parameterFuel <threshold>)
 -->
 (<s> ^operator <o> > <o2>)
-(write |deliverLeaflet vs moveFood | <value> | higher than | <threshold> (crlf) )}
+(write |deliverLeaflet vs moveFood - deliverLeaflet wins| (crlf) )}
+
+# Move toward the delivery spot before wandering or chasing jewels.
+sp {pref*moveDeliverySpot*wander
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name wander)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs wander - moveDeliverySpot wins| (crlf))}
+
+sp {pref*moveDeliverySpot*moveJewel
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name moveJewel)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs moveJewel - moveDeliverySpot wins| (crlf))}
+
+sp {pref*moveDeliverySpot*getJewel
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name getJewel)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs getJewel - moveDeliverySpot wins| (crlf))}
+
+sp {pref*moveDeliverySpot*eatFood
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name eatFood)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs eatFood - moveDeliverySpot wins| (crlf))}
+
+sp {pref*moveDeliverySpot*moveFood
+(state <s> ^operator <o> +
+                     <o2> +)
+(<o> ^name moveDeliverySpot)
+(<o2> ^name moveFood)
+-->
+(<s> ^operator <o> > <o2>)
+(write |moveDeliverySpot vs moveFood - moveDeliverySpot wins| (crlf))}

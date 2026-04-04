@@ -228,7 +228,6 @@ public class SoarBridge
                 List<ws3dproxy.model.Leaflet> leaflets = c.getLeaflets();
                 c.updateBag() ;
                 ws3dproxy.model.Bag bag = c.getBag();
-                System.out.println(bag.printBag());
                 if (leaflets != null && !leaflets.isEmpty())
                 {
                     Identifier leafletsWme = CreateIdWME(creature, "LEAFLETS");
@@ -250,8 +249,6 @@ public class SoarBridge
                             int required = leaflet.getTotalNumberOfType(color);
                             int inBag = (bag != null) ? bag.getNumberCrystalPerType(color) : 0;
                             int missing = Math.max(required - inBag, 0);
-
-                            System.out.println("Leaflet ID: " + leaflet.getID() + ", Color: " + color + ", Required: " + required + ", In Bag: " + inBag + ", Missing: " + missing);
                             if (missing > 0)
                             {
                                 Identifier missingWme = CreateIdWME(leafletWme, "MISSING_COLOR");
@@ -424,6 +421,7 @@ public class SoarBridge
                             break;
 
                         case DELIVER:
+                            System.out.println("Processando comando de entrega ...");
                             String leafletIdToDeliver = null;
                             command = new Command(Command.CommandType.DELIVER);
                             CommandDeliver commandDeliver = (CommandDeliver)command.getCommandArgument();
@@ -433,6 +431,7 @@ public class SoarBridge
                                 if (leafletIdToDeliver != null) commandDeliver.setLeafletId(leafletIdToDeliver);
                                 commandList.add(command);
                             }
+                            System.out.println("Command Deliver adicionado a lista de comandos a serem processados");
                             break;
 
                         default:
@@ -616,7 +615,9 @@ public class SoarBridge
     {
         if (soarCommandDeliver != null)
         {
+            System.out.println("Processando comando de entrega do leaflet id "+soarCommandDeliver.getLeafletId());
             c.deliverLeaflet(soarCommandDeliver.getLeafletId());
+            System.out.println("Comando de entrega processado para leaflet id "+soarCommandDeliver.getLeafletId());
         }
         else
         {
