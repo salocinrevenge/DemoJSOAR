@@ -566,6 +566,7 @@ sp {propose*deliver*leaflet
    (<leaflets> ^LEAFLET <leaflet>)
    (<leaflet> ^ID <leafletId>)
    (<leaflet> ^MISSING <missing> 0.0)
+   (<leaflet> ^SCORE <score>)
    (<creature> ^SENSOR.VISUAL.ENTITY <deliverySpot>)
    (<deliverySpot> ^TYPE DELIVERYSPOT)
    (<deliverySpot> ^DISTANCE <deliveryDistance> < 30)
@@ -573,6 +574,7 @@ sp {propose*deliver*leaflet
    (<s> ^operator <o> +)
    (<o> ^name deliverLeaflet)
    (<o> ^parameter <newleaflet>)
+   (<newleaflet> ^SCORE <score>)
    (<newleaflet> ^ID <leafletId>)}
 
 # Apply*deliver*leaflet:
@@ -583,6 +585,7 @@ sp {apply*deliver*leaflet
    (<o> ^name deliverLeaflet)
    (<o> ^parameter <leaflet>)
    (<leaflet> ^ID <leafletId>)
+   (<leaflet> ^SCORE <score>)
    - (<ol> ^DELIVER <anything>)
 -->
    (<ol> ^DELIVER <command>)

@@ -615,6 +615,7 @@ public class SoarBridge
     {
         if (soarCommandDeliver != null)
         {
+            System.out.println("Processando comando de entrega do leaflet id "+soarCommandDeliver.getLeafletId());
             String leafletId = soarCommandDeliver.getLeafletId();
             if (leafletId != null) {
                 try {
@@ -623,7 +624,9 @@ public class SoarBridge
                     // mantém valor original se não for numérico
                 }
             }
+            System.out.println("Comando de entrega processado para leaflet id "+leafletId);
             c.deliverLeaflet(leafletId);
+            System.out.println("Comando de entrega processado para leaflet id "+soarCommandDeliver.getLeafletId());
         }
         else
         {
