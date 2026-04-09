@@ -1,0 +1,210 @@
+################################  CONFIGURATION ################################
+watch 5
+learn --off
+epmem --set learning off 
+#smem --off
+#log --level error
+
+
+
+
+
+
+############### ALL INIT BUILD ###############
+
+# Plan build: Se não existe plano, cria um plano com passo 0
+sp {plan-build
+   (state <s> ^io.output-link <OL>
+             -^plan <P>)
+-->
+   (<OL> ^plan <P>)
+   (<P> ^step 0)
+}
+
+# Action build
+sp {world*propose*initialize
+   (state <s> ^superstate nil
+             -^name)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name initialize-world)
+}
+
+sp {world*apply*initialize
+   (state <s> ^operator.name initialize-world)
+-->
+
+	(<s> ^action <act>)
+	(<act> ^name wander)
+   (<s> ^name World)
+   (<s> ^gemCheck <gc>)
+   (<gc> ^gemsNeeded 0)
+   (<gc> ^gemsFound 0)
+   (<s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id 0 ^value 0.0)
+   (write |WORLD INITIALIZED| (crlf))
+   
+}
+
+sp {propose*change_best_leaflet
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <ID>)
+   (<s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <bestID>)
+   (<bestLeafLet> ^value <bestValue>)
+   (<leaflet> ^PAYMENT <payment> > <bestValue>)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name change_best_leaflet)
+   (<o> ^id <ID>)
+   (<o> ^value <payment>)
+}
+
+sp {apply*change_best_leaflet
+   (state <s> ^operator <o>)
+   (<o> ^name change_best_leaflet)
+   (<o> ^id <ID>)
+   (<o> ^value <payment>)
+-->
+   (<s> ^bestLeafLet <bestLeafLet> -)
+   (<s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <ID>)
+   (<bestLeafLet> ^value <payment>)
+}
+
+
+############### WANDERING STATE ###############
+# Verifica se deve sair do wandering:
+
+# Conta o número de cores/gemas necessárias do leaflet selecionado
+sp {count*gemsNeeded
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletID>)
+   (<leaflet> ^MISSING_COLORS <requiredColors>)
+   (<requiredColors> ^COLOR <color>)
+   (state <s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <bestID>)
+   (<leafletID> == <bestID>)
+   (state <s> ^gemCheck <gc>)
+   (<gc> ^gemsNeeded <oldCount> 0)
+   (<gc> ^gemsFound <oldFound> 0)
+-->
+   (state <s> ^gemCheck <gc> -)
+   (state <s> ^gemCheck <gc>)
+   (<gc> ^gemsNeeded <oldCount> -)
+   (<gc> ^gemsNeeded (+ <oldCount> 1))
+   (write |Gema necessária encontrada: | <color> (crlf))
+}
+
+# Verifica se cada gema necessária está na visão da criatura
+sp {check*allGemsInSight
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR.VISUAL <vision>)
+   (<vision> ^ENTITY <visualEntity>)
+   (<visualEntity> ^TYPE JEWEL)
+   (<visualEntity> ^COLOR <jewelColor>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletID>)
+   (<leaflet> ^REQUIRED_COLORS <requiredColors>)
+   (<requiredColors> ^COLOR <requiredColor>)
+   (<jewelColor> == <requiredColor>)
+   (state <s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <bestID>)
+   (<leafletID> == <bestID>)
+   (state <s> ^gemCheck <gc>)
+   (<gc> ^gemsNeeded <gemsNeeded>)
+   (<gc> ^gemsFound <oldFound>)
+-->
+   (state <s> ^gemCheck <gc> -)
+   (state <s> ^gemCheck <gc>)
+   (<gc> ^gemsFound <oldFound> -)
+   (<gc> ^gemsFound (+ <oldFound> 1))
+   (write |Gema observada na visão: | <requiredColor> (crlf))
+}
+
+# Muda o state para planning quando todas as gemas necessárias foram encontradas
+sp {change*state*to*planning
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (state <s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <bestID> > 0)
+   (state <s> ^gemCheck <gc>)
+   (<gc> ^gemsNeeded <needed> > 0)
+   (<gc> ^gemsFound <found>)
+   (<needed> == <found>)
+   (state <s> ^action <action>)
+   (<action> ^name wander)
+-->
+   (state <s> ^action <action> -)
+   (state <s> ^action <action>)
+   (<action> ^name planning)
+   (write |MUDANDO PARA PLANNING - Todas as gemas necessárias foram encontradas!| (crlf))
+}
+
+# Se a acao é wander, continua a vagar
+sp {propose*wandering
+   (state <s> ^action <action>)
+   (<action> ^name wander)
+   (state <s> ^io.input-link <il>)
+-->
+   (<s> ^operator <o> + < )
+   (<o> ^name wander)
+}
+
+# Apply*wander:
+# If the wander operator is selected, then generate an output command to it 
+sp {apply*wander
+   (state <s> ^operator <o>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<o> ^name wander)
+-->
+   (<ol> ^MOVE <command>)
+   (<command> ^Vel 0)
+   (<command> ^VelR 2)
+   (<command> ^VelL 0)
+   (interrupt) 
+}
+
+
+# Se a acao é wander, continua a vagar
+sp {propose*walking
+   (state <s> ^action <action>)
+   (<action> ^name planning)
+   (state <s> ^io.input-link <il>)
+-->
+   (<s> ^operator <o> +)
+   (<o> ^name walk)
+}
+
+
+# Wander Preferences
+sp {pref*wander
+(state <s> ^operator <o> +)
+(<o> ^name wander)
+-->
+(<s> ^operator <o> <)}
+
+# Apply*walk:
+# If the walk operator is selected, then generate an output command to it 
+sp {apply*walking
+   (state <s> ^operator <o>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<o> ^name walk)
+-->
+   (<ol> ^MOVE <command>)
+   (<command> ^Vel 0)
+   (<command> ^VelR 2)
+   (<command> ^VelL 2)
+   (interrupt) 
+}
+
