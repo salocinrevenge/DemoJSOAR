@@ -88,13 +88,99 @@ sp {propose*create_general_state
    (<o> ^name create_general_state)
 }
 
-# Aplica a criacao do general_state
+# Aplica a criacao do general_state - Copia profunda do input-link e cria sacoNeg
 sp {apply*create_general_state
-   (state <s> ^operator <o>)
+   (state <s> ^operator <o>
+              ^io <io>
+              ^bestLeafLet <bestLeafLet>)
+   (<io> ^input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR <sensor>)
+   (<sensor> ^FUEL <fuel>)
+   (<fuel> ^VALUE <fuelValue>)
+   (<sensor> ^VISUAL <visual>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <bestID>)
+   (<bestLeafLet> ^id <bestID>)
    (<o> ^name create_general_state)
 -->
+   # Criar estrutura geral_state com raiz
    (<s> ^general_state <gs>)
    (<gs> ^status initialized)
+   
+   # Copiar combustível (cópia profunda do FUEL)
+   (<gs> ^fuel <fuelCopy>)
+   (<fuelCopy> ^value <fuelValue>)
+   
+   # Copiar estrutura de visão (SENSOR.VISUAL)
+   (<gs> ^visual <visualCopy>)
+   (<visualCopy> ^entity-list <entityList>)
+   
+   # Criar sacoNeg com base no leaflet necessário
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<sacoNeg> ^leaflet-id <bestID>)
+   (<sacoNeg> ^total-missing 0)
+}
+
+# Copiar todas as entidades visuais para general_state (comidas e jóias)
+sp {apply*create_general_state*copy*entities
+   (state <s> ^general_state <gs>)
+   (<gs> ^visual <visualCopy>)
+   (<visualCopy> ^entity-list <entityList>)
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR.VISUAL <visual>)
+   (<visual> ^ENTITY <entity>)
+   (<entity> ^TYPE <type>)
+   (<entity> ^NAME <name>)
+   (<entity> ^DISTANCE <distance>)
+   (<entity> ^X <x>)
+   (<entity> ^Y <y>)
+-->
+   # Copiar cada entidade (cópia profunda)
+   (<entityList> ^entity <entityCopy>)
+   (<entityCopy> ^type <type>)
+   (<entityCopy> ^name <name>)
+   (<entityCopy> ^distance <distance>)
+   (<entityCopy> ^x <x>)
+   (<entityCopy> ^y <y>)
+}
+
+# Copiar informações de cor das entidades (se houver)
+sp {apply*create_general_state*copy*entity*color
+   (state <s> ^general_state <gs>)
+   (<gs> ^visual <visualCopy>)
+   (<visualCopy> ^entity-list <entityList>)
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^SENSOR.VISUAL.ENTITY <entity>)
+   (<entity> ^TYPE <type>)
+   (<entity> ^NAME <name>)
+   (<entity> ^COLOR <color>)
+   (<entityList> ^entity <entityCopy>)
+   (<entityCopy> ^name <name>)
+-->
+   (<entityCopy> ^color <color>)
+}
+
+# Criar sacoNeg com as cores necessárias do leaflet escolhido
+sp {apply*create_general_state*create*sacoNeg
+   (state <s> ^general_state <gs>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<gs> ^status initialized)
+   (state <s> ^bestLeafLet <bestLeafLet>)
+   (<bestLeafLet> ^id <bestID>)
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <bestID>)
+   (<leaflet> ^MISSING <totalMissing>)
+-->
+   # Armazenar total de jóias faltantes
+   (<sacoNeg> ^total-missing <totalMissing>)
+   (write |GENERAL STATE CREATED - Total missing items: | <totalMissing> | for leaflet: | <bestID> (crlf))
 }
 
 
