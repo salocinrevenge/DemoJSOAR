@@ -120,7 +120,8 @@ sp {apply*create_general_state
    # Criar sacoNeg com base no leaflet necessário
    (<gs> ^sacoNeg <sacoNeg>)
    (<sacoNeg> ^leaflet-id <bestID>)
-   (<sacoNeg> ^total-missing 0)
+   (<sacoNeg> ^total-missing -1)
+   (write |GENERAL STATE CREATED - Fuel: | <fuelValue> | for leaflet: | <bestID> (crlf))
 }
 
 # Copiar todas as entidades visuais para general_state (comidas e jóias)
@@ -145,6 +146,7 @@ sp {apply*create_general_state*copy*entities
    (<entityCopy> ^distance <distance>)
    (<entityCopy> ^x <x>)
    (<entityCopy> ^y <y>)
+   (write |COPIED ENTITY - Type: | <type> | Name: | <name> | Distance: | <distance> | X: | <x> | Y: | <y> (crlf))
 }
 
 # Copiar informações de cor das entidades (se houver)
@@ -162,6 +164,8 @@ sp {apply*create_general_state*copy*entity*color
    (<entityCopy> ^name <name>)
 -->
    (<entityCopy> ^color <color>)
+   (write |COPIED ENTITY COLOR - Type: | <type> | Name: | <name> | Color: | <color> (crlf))
+
 }
 
 # Criar sacoNeg com as cores necessárias do leaflet escolhido
@@ -178,6 +182,8 @@ sp {apply*create_general_state*create*sacoNeg
    (<leaflet> ^ID <bestID>)
    (<leaflet> ^MISSING <totalMissing>)
 -->
+   # Remover total-missing antigo
+   (<sacoNeg> ^total-missing -1 -)
    # Armazenar total de jóias faltantes
    (<sacoNeg> ^total-missing <totalMissing>)
    (write |GENERAL STATE CREATED - Total missing items: | <totalMissing> | for leaflet: | <bestID> (crlf))
