@@ -189,6 +189,89 @@ sp {apply*create_general_state*create*sacoNeg
    (write |GENERAL STATE CREATED - Total missing items: | <totalMissing> | for leaflet: | <bestID> (crlf))
 }
 
+# Copiar as cores faltantes do leaflet para o sacoNeg
+sp {apply*create_general_state*create*sacoNeg*colors
+   (state <s> ^general_state <gs>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<gs> ^status initialized)
+   (<sacoNeg> ^leaflet-id <bestID>)
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <bestID>)
+   (<leaflet> ^MISSING_COLOR <missingColor>)
+   (<missingColor> ^COLOR <color>)
+   (<missingColor> ^COUNT <count>)
+-->
+   # Copiar cada cor faltante para o sacoNeg
+   (<sacoNeg> ^missing-color <missingColorCopy>)
+   (<missingColorCopy> ^color <color>)
+   (<missingColorCopy> ^count <count>)
+   (<missingColorCopy> ^visible-count 0)
+   (write |COPIED MISSING COLOR - Color: | <color> | Count: | <count> | for leaflet: | <bestID> (crlf))
+}
+
+# 1. Proposição
+sp {propose*count-jewel
+   (state <s> ^general_state <gs>)
+   (<gs> ^visual.entity-list.entity <e>)
+   (<e> ^type JEWEL ^color <color>)
+   (<gs> ^sacoNeg.missing-color <mc>)
+   (<mc> ^color <color>)
+   - (<e> ^counted-for <mc>)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name count-jewel
+        ^entity <e>
+        ^target-color-ref <mc>
+        ^color-name <color>) # Adicionei isso para facilitar o log
+}
+
+# 2. Aplicação
+sp {apply*count-jewel
+   (state <s> ^operator <o>)
+   (<o> ^name count-jewel
+        ^entity <e>
+        ^target-color-ref <mc>
+        ^color-name <color>)
+   (<mc> ^visible-count <current>) # Aqui é onde costuma falhar se o valor sumir
+-->
+   (<mc> ^visible-count <current> -
+                  (+ <current> 1))
+   (<e> ^counted-for <mc>)
+   (write |COUNTED JEWEL | <color> | - New count: | (+ <current> 1) (crlf))
+}
+
+sp {propose*start-planning
+   (state <s> ^general_state <gs>)
+   (state <s> -^planning-started)
+   # Importante: só planeja se não houver mais nenhuma joia para contar agora
+   - (<s> ^operator.name count-jewel) 
+   (<gs> ^sacoNeg <sacoNeg>)
+   # Testa se NÃO existe nenhuma cor cujo count necessário seja maior que o visível
+   - {
+      (<sacoNeg> ^missing-color <mc>)
+      (<mc> ^count <required>)
+      (<mc> ^visible-count <visible> < <required>)
+   }
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name start-planning)
+   (<s> ^planning-started 1)
+   (write |ALL REQUIRED JEWELS VISIBLE - STARTING PLANNING| (crlf))
+}
+
+
+sp {pref*count-over-planning
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name count-jewel)
+   (<o2> ^name start-planning)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
 
 ############### WANDERING STATE ###############
 # Verifica se deve sair do wandering:
