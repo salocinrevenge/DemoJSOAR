@@ -243,25 +243,31 @@ sp {apply*count-jewel
    (write |COUNTED JEWEL | <color> | - New count: | (+ <current> 1) (crlf))
 }
 
+# 1. Propor o planejamento (Apenas testa condições)
 sp {propose*start-planning
    (state <s> ^general_state <gs>)
-   (state <s> -^planning-started)
-   # Importante: só planeja se não houver mais nenhuma joia para contar agora
+   (state <s> -^planning-started) # Se já planejou, não propõe mais
    - (<s> ^operator.name count-jewel) 
    (<gs> ^sacoNeg <sacoNeg>)
-   # Testa se NÃO existe nenhuma cor cujo count necessário seja maior que o visível
+   # Garante que todas as cores necessárias têm count visível suficiente
    - {
       (<sacoNeg> ^missing-color <mc>)
       (<mc> ^count <required>)
-      (<mc> ^visible-count <visible> < <required>)
+      (<mc> ^visible-count < <required>)
    }
 -->
    (<s> ^operator <o> + =)
    (<o> ^name start-planning)
+}
+
+# 2. Aplicar o planejamento (Efetua a mudança no estado)
+sp {apply*start-planning
+   (state <s> ^operator <o>)
+   (<o> ^name start-planning)
+-->
    (<s> ^planning-started 1)
    (write |ALL REQUIRED JEWELS VISIBLE - STARTING PLANNING| (crlf))
 }
-
 
 sp {pref*count-over-planning
    (state <s> ^operator <o1> +
