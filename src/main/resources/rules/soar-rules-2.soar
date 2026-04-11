@@ -279,6 +279,138 @@ sp {pref*count-over-planning
 }
 
 
+################## PLANNING STATE ###############
+# Proposição do operador plan-move-jewel
+# Propõe mover para uma joia quando ainda há jóias faltantes
+sp {propose*plan-move-jewel
+   (state <s> ^general_state <gs>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<sacoNeg> ^total-missing <totalMissing> <> 0)
+   # Encontra uma cor que ainda tem jóias para coletar
+   (<sacoNeg> ^missing-color <mc>)
+   (<mc> ^color <color>)
+   (<mc> ^count <count> <> 0)
+   # Encontra uma entidade visual com essa cor
+   (<gs> ^visual.entity-list.entity <entity>)
+   (<entity> ^type JEWEL)
+   (<entity> ^color <color>)
+   (<entity> ^x <x>)
+   (<entity> ^y <y>)
+   (<entity> ^name <entityName>)
+   # Obtém o step atual do plano
+   (state <s> ^io.output-link.plan <plan>)
+   (<plan> ^step <currentStep>)
+   (<s> ^planning-started 1)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name plan-move-jewel)
+   (<o> ^target-color <color>)
+   (<o> ^target-coordinate <coord>)
+   (<coord> ^x <x>)
+   (<coord> ^y <y>)
+   (<o> ^target-entity <entity>)
+   (<o> ^target-entity-name <entityName>)
+   (<o> ^missing-color-ref <mc>)
+   (<o> ^current-step <currentStep>)
+   (write |PROPOSED: Plan move jewel to | <color> | at (| <x> |, | <y> |)| (crlf))
+}
+
+# Aplicação do operador plan-move-jewel
+# Adiciona o movimento ao plano (em uma estrutura de vetor) e incrementa o step
+sp {apply*plan-move-jewel
+   (state <s> ^operator <o>
+              ^general_state <gs>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<ol> ^plan <plan>)
+   (<o> ^name plan-move-jewel)
+   (<o> ^target-color <color>)
+   (<o> ^target-coordinate <coord>)
+   (<coord> ^x <x>)
+   (<coord> ^y <y>)
+   (<o> ^target-entity <entity>)
+   (<o> ^missing-color-ref <mc>)
+   (<o> ^current-step <currentStep>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<sacoNeg> ^total-missing <totalMissing>)
+   (<mc> ^count <count>)
+   (<mc> ^visible-count <visibleCount>)
+   (<plan> ^step <currentStep>)
+-->
+   # Criar elemento no plan para este step com o MOVE
+   (<plan> ^<currentStep> <stepAction>)
+   (<stepAction> ^MOVE <command>)
+   (<command> ^Vel 1)
+   (<command> ^VelR 1)
+   (<command> ^VelL 1)
+   (<command> ^X <x>)
+   (<command> ^Y <y>)
+   
+   # Incrementar o step do plan
+   (<plan> ^step <currentStep> -
+                (+ <currentStep> 1))
+   
+   # Remover a joia da lista visual do general state
+   (<gs> ^visual.entity-list <entityList>)
+   (<entityList> ^entity <entity> -)
+   
+   # Decrementar count do missing-color
+   (<mc> ^count <count> -
+            (- <count> 1))
+   
+   # Decrementar visible-count
+   (<mc> ^visible-count <visibleCount> -
+                     (- <visibleCount> 1))
+   
+   # Decrementar total-missing
+   (<sacoNeg> ^total-missing <totalMissing> -
+                        (- <totalMissing> 1))
+   
+   (write |APPLIED: Planned move to collect | <color> | at (| <x> |, | <y> |) - Step: | <currentStep> (crlf))
+}
+
+# Preferência entre operadores plan-move-jewel
+# Escolhe qualquer caso de joia válida (sem preferência específica)
+sp {pref*plan-move-jewel
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-move-jewel)
+   (<o2> ^name plan-move-jewel)
+-->
+   # Ambos são igualmente bons - deixa o Soar decidir
+}
+
+# Preferência: planejamento tem prioridade sobre contar joias
+sp {pref*plan-move-over-count
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-move-jewel)
+   (<o2> ^name count-jewel)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+# Preferência: planejamento tem prioridade sobre start-planning
+sp {pref*plan-move-over-start-planning
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-move-jewel)
+   (<o2> ^name start-planning)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+# Preferência: planejamento tem prioridade sobre wandering
+sp {pref*plan-move-over-wander
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-move-jewel)
+   (<o2> ^name wander)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+
 ############### WANDERING STATE ###############
 # Verifica se deve sair do wandering:
 
