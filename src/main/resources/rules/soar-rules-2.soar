@@ -146,7 +146,7 @@ sp {apply*create_general_state*copy*entities
    (<entityCopy> ^distance <distance>)
    (<entityCopy> ^x <x>)
    (<entityCopy> ^y <y>)
-   (write |COPIED ENTITY - Type: | <type> | Name: | <name> | Distance: | <distance> | X: | <x> | Y: | <y> (crlf))
+   # (write |COPIED ENTITY - Type: | <type> | Name: | <name> | Distance: | <distance> | X: | <x> | Y: | <y> (crlf))
 }
 
 # Copiar informações de cor das entidades (se houver)
@@ -164,7 +164,7 @@ sp {apply*create_general_state*copy*entity*color
    (<entityCopy> ^name <name>)
 -->
    (<entityCopy> ^color <color>)
-   (write |COPIED ENTITY COLOR - Type: | <type> | Name: | <name> | Color: | <color> (crlf))
+   # (write |COPIED ENTITY COLOR - Type: | <type> | Name: | <name> | Color: | <color> (crlf))
 
 }
 
@@ -209,7 +209,7 @@ sp {apply*create_general_state*create*sacoNeg*colors
    (<missingColorCopy> ^color <color>)
    (<missingColorCopy> ^count <count>)
    (<missingColorCopy> ^visible-count 0)
-   (write |COPIED MISSING COLOR - Color: | <color> | Count: | <count> | for leaflet: | <bestID> (crlf))
+   # (write |COPIED MISSING COLOR - Color: | <color> | Count: | <count> | for leaflet: | <bestID> (crlf))
 }
 
 # 1. Proposição
@@ -312,7 +312,7 @@ sp {propose*plan-move-jewel
    (<o> ^target-entity-name <entityName>)
    (<o> ^missing-color-ref <mc>)
    (<o> ^current-step <currentStep>)
-   (write |PROPOSED: Plan move jewel to | <color> | at (| <x> |, | <y> |)| (crlf))
+   # (write |PROPOSED: Plan move jewel to | <color> | at (| <x> |, | <y> |)| (crlf))
 }
 
 # Aplicação do operador plan-move-jewel
@@ -321,7 +321,10 @@ sp {apply*plan-move-jewel
    (state <s> ^operator <o>
               ^general_state <gs>
               ^io <io>)
-   (<io> ^output-link <ol>)
+   (<io> ^output-link <ol>
+         ^input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^PARAMETERS.MINFUEL <minFuel>)
    (<ol> ^plan <plan>)
    (<o> ^name plan-move-jewel)
    (<o> ^target-color <color>)
@@ -332,6 +335,8 @@ sp {apply*plan-move-jewel
    (<o> ^missing-color-ref <mc>)
    (<o> ^current-step <currentStep>)
    (<gs> ^sacoNeg <sacoNeg>)
+   (<gs> ^fuel <fuelCopy>)
+   (<fuelCopy> ^value <fuelValue> > <minFuel>)
    (<sacoNeg> ^total-missing <totalMissing>)
    (<mc> ^count <count>)
    (<mc> ^visible-count <visibleCount>)
@@ -406,6 +411,161 @@ sp {pref*plan-move-over-wander
               ^operator <o2> +)
    (<o1> ^name plan-move-jewel)
    (<o2> ^name wander)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+
+################## DELIVERY STATE ###############
+# Proposição do operador plan-move-delivery-spot
+# Propõe mover para o ponto de entrega quando todos os itens foram coletados
+sp {propose*plan-move-delivery-spot
+   (state <s> ^general_state <gs>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<sacoNeg> ^total-missing 0)
+   # Encontra o ponto de entrega na lista visual
+   (<gs> ^visual.entity-list.entity <entity>)
+   (<entity> ^type DELIVERYSPOT)
+   (<entity> ^x <x>)
+   (<entity> ^y <y>)
+   (<entity> ^name <entityName>)
+   # Obtém o step atual do plano
+   (state <s> ^io.output-link.plan <plan>)
+   (<plan> ^step <currentStep>)
+   (<s> ^planning-started 1)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name plan-move-delivery-spot)
+   (<o> ^target-coordinate <coord>)
+   (<coord> ^x <x>)
+   (<coord> ^y <y>)
+   (<o> ^target-entity <entity>)
+   (<o> ^target-entity-name <entityName>)
+   (<o> ^current-step <currentStep>)
+   (write |PROPOSED: Plan move to delivery spot at (| <x> |, | <y> |)| (crlf))
+}
+
+# Aplicação do operador plan-move-delivery-spot
+# Adiciona o movimento para o delivery spot ao plano
+sp {apply*plan-move-delivery-spot
+   (state <s> ^operator <o>
+              ^general_state <gs>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<ol> ^plan <plan>)
+   (<o> ^name plan-move-delivery-spot)
+   (<o> ^target-coordinate <coord>)
+   (<coord> ^x <x>)
+   (<coord> ^y <y>)
+   (<o> ^current-step <currentStep>)
+   (<plan> ^step <currentStep>)
+-->
+   # Criar elemento no plan para este step com o MOVE
+   (<plan> ^<currentStep> <stepAction>)
+   (<stepAction> ^MOVE <command>)
+   (<command> ^Vel 1)
+   (<command> ^VelR 1)
+   (<command> ^VelL 1)
+   (<command> ^X <x>)
+   (<command> ^Y <y>)
+   
+   # Incrementar o step do plan
+   (<plan> ^step <currentStep> -
+                (+ <currentStep> 1))
+   
+   (write |APPLIED: Planned move to delivery spot at (| <x> |, | <y> |) - Step: | <currentStep> (crlf))
+}
+
+# Proposição do operador plan-deliver-leaflet
+# Propõe entregar o folheto quando está próximo do ponto de entrega
+sp {propose*plan-deliver-leaflet
+   (state <s> ^general_state <gs>)
+   (<gs> ^sacoNeg <sacoNeg>)
+   (<sacoNeg> ^total-missing 0)
+   # Encontra o ponto de entrega muito próximo
+   (<gs> ^visual.entity-list.entity <entity>)
+   (<entity> ^type DELIVERYSPOT)
+   (<entity> ^distance <distance> < 30)
+   # Obtém informações do leaflet
+   (state <s> ^io.input-link <il>)
+   (<il> ^CREATURE <creature>)
+   (<creature> ^LEAFLETS <leaflets>)
+   (<leaflets> ^LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletId>)
+   (<leaflet> ^SCORE <score>)
+   (<sacoNeg> ^leaflet-id <leafletId>)
+   # Obtém o step atual do plano
+   (state <s> ^io.output-link.plan <plan>)
+   (<plan> ^step <currentStep>)
+-->
+   (<s> ^operator <o> + =)
+   (<o> ^name plan-deliver-leaflet)
+   (<o> ^leaflet-id <leafletId>)
+   (<o> ^leaflet-score <score>)
+   (<o> ^current-step <currentStep>)
+   (write |PROPOSED: Plan deliver leaflet ID: | <leafletId> | with score: | <score> (crlf))
+}
+
+# Aplicação do operador plan-deliver-leaflet
+# Adiciona a entrega do folheto ao plano, executa o primeiro comando e reseta o estado
+sp {apply*plan-deliver-leaflet
+   (state <s> ^operator <o>
+              ^general_state <gs>
+              ^io <io>
+              ^action <act>)
+   (<io> ^output-link <ol>)
+   (<ol> ^plan <plan>)
+   (<plan> ^0 <firstCommand>)
+   (<o> ^name plan-deliver-leaflet)
+   (<o> ^leaflet-id <leafletId>)
+   (<o> ^leaflet-score <score>)
+   (<o> ^current-step <currentStep>)
+   (<plan> ^step <currentStep>)
+-->
+   # Criar elemento no plan para este step com o DELIVER
+   (<plan> ^<currentStep> <stepAction>)
+   (<stepAction> ^DELIVER <command>)
+   (<command> ^ID <leafletId>)
+   
+   # Incrementar o step do plan
+   (<plan> ^step <currentStep> -
+                (+ <currentStep> 1))
+   
+   # Copiar o primeiro comando do plano para o output-link e executar
+   (<ol> ^MOVE <firstCommand>)
+   
+   # Remover planning-started
+   (<s> ^planning-started 1 -)
+   
+   # Remover general_state
+   (<s> ^general_state <gs> -)
+   
+   # Resetar action para wander
+   (<s> ^action <act> -)
+   (<s> ^action <newAct>)
+   (<newAct> ^name wander)
+   
+   (write |APPLIED: Planned deliver leaflet ID: | <leafletId> | - Step: | <currentStep> (crlf))
+   (write |EXECUTION STARTED - First command being executed| (crlf))
+}
+
+# Preferências para as operações de entrega
+# Move delivery spot tem prioridade sobre contar/planejar joias
+sp {pref*plan-move-delivery-over-plan-move-jewel
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-move-delivery-spot)
+   (<o2> ^name plan-move-jewel)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+# Deliver leaflet tem prioridade máxima
+sp {pref*plan-deliver-over-all
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-deliver-leaflet)
+   (<o2> ^name << plan-move-delivery-spot plan-move-jewel count-jewel start-planning >>)
 -->
    (<s> ^operator <o1> > <o2>)
 }
