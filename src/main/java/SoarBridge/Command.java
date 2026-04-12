@@ -16,7 +16,8 @@ public class Command
         MOVE,
         GET,
         EAT,
-        DELIVER
+        DELIVER,
+        EXECUTE
     }
 
     private CommandType commandType;

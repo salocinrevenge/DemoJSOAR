@@ -404,26 +404,100 @@ sp {pref*plan-move-over-wander
 
 
 ################## DELIVERY STATE ###############
-# Proposição do operador plan-move-delivery-spot
-# Propõe mover para o ponto de entrega quando todos os itens foram coletados
-sp {propose*plan-move-delivery-spot
+# Proposição do operador plan-delivery
+# Propõe mover para o ponto de entrega e entregar quando todos os itens foram coletados
+sp {propose*plan-delivery
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing <= 0) # MUDANÇA AQUI: Sintaxe correta Soar
+   (<sacoNeg> ^total-missing <= 0)
    (<gs> ^visual.entity-list.entity <entity>)
    (<entity> ^type DELIVERYSPOT ^x <x> ^y <y> ^name <entityName>)
+   (state <s> ^io.input-link.CREATURE.LEAFLETS.LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletId> ^SCORE <score>)
+   (<sacoNeg> ^leaflet-id <leafletId>)
    (state <s> ^io.output-link.plan <plan>)
    (<plan> ^step <currentStep>)
    (<s> ^planning-started 1)
 -->
    (<s> ^operator <o> + =)
-   (<o> ^name plan-move-delivery-spot
+   (<o> ^name plan-delivery
         ^target-coordinate <coord>
         ^target-entity <entity>
         ^target-entity-name <entityName>
+        ^leaflet-id <leafletId>
         ^current-step <currentStep>)
    (<coord> ^x <x> ^y <y>)
-   (write |PROPOSED: All items collected. Planning move to delivery spot.| (crlf))
+}
+
+# Aplicação do operador plan-delivery
+# Adiciona o movimento para o delivery spot, a entrega e finaliza o plano
+sp {apply*plan-delivery
+   (state <s> ^operator <o>
+              ^general_state <gs>
+              ^io <io>)
+   (<io> ^output-link <ol>)
+   (<ol> ^plan <plan>)
+   (<o> ^name plan-delivery)
+   (<o> ^target-coordinate <coord>)
+   (<coord> ^x <x>)
+   (<coord> ^y <y>)
+   (<o> ^leaflet-id <leafletId>)
+   (<o> ^current-step <currentStep>)
+   (<plan> ^step <currentStep>)
+-->
+   # 1. Adiciona o MOVE para o delivery spot
+   (<plan> ^<currentStep> <moveAction>)
+   (<moveAction> ^MOVE <moveCommand>)
+   (<moveCommand> ^Vel 1 ^VelR 1 ^VelL 1 ^X <x> ^Y <y>)
+
+   # 2. Adiciona o DELIVER no próximo step
+   (<plan> ^(+ <currentStep> 1) <deliverAction>)
+   (<deliverAction> ^DELIVER <deliverCommand>)
+   (<deliverCommand> ^ID <leafletId>)
+
+   # 3. Incrementa o step final do plano
+   (<plan> ^step <currentStep> -
+           ^step (+ <currentStep> 2))
+
+   # 4. Cria o comando de execução para o Java ler
+   (<ol> ^EXECUTE <exec>)
+   (<exec> ^status pending)
+
+   (write |PLAN COMPLETE. Sending EXECUTE command to Java and Halting.| (crlf))
+
+   # 5. Para o agente Soar
+   (halt)
+}
+
+# Preferências para as operações de entrega
+# Move delivery spot tem prioridade sobre contar/planejar joias
+sp {pref*plan-delivery-over-plan-move-jewel
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-delivery)
+   (<o2> ^name plan-move-jewel)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+# Deliver leaflet tem prioridade máxima
+sp {pref*plan-delivery-over-all
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-delivery)
+   (<o2> ^name << plan-move-jewel count-jewel start-planning >>)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
+
+
+sp {pref*halt-over-all
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-delivery)
+   (<o2> ^name count-jewel)
+-->
+   (<s> ^operator <o1> > <o2>)
 }
 
 # Aplicação do operador plan-move-delivery-spot
@@ -487,38 +561,27 @@ sp {apply*plan-deliver-leaflet
               ^action <act>)
    (<io> ^output-link <ol>)
    (<ol> ^plan <plan>)
-   (<plan> ^0 <firstCommand>)
    (<o> ^name plan-deliver-leaflet)
    (<o> ^leaflet-id <leafletId>)
-   (<o> ^leaflet-score <score>)
    (<o> ^current-step <currentStep>)
-   (<plan> ^step <currentStep>)
 -->
-   # Criar elemento no plan para este step com o DELIVER
+   # 1. Adiciona o último comando (DELIVER) ao plano
    (<plan> ^<currentStep> <stepAction>)
    (<stepAction> ^DELIVER <command>)
    (<command> ^ID <leafletId>)
    
-   # Incrementar o step do plan
+   # 2. Incrementa o step final
    (<plan> ^step <currentStep> -
-                (+ <currentStep> 1))
+           ^step (+ <currentStep> 1))
    
-   # Copiar o primeiro comando do plano para o output-link e executar
-   (<ol> ^MOVE <firstCommand>)
+   # 3. Cria o comando de execução para o Java ler
+   (<ol> ^EXECUTE <exec>)
+   (<exec> ^status pending)
+
+   (write |PLAN COMPLETE. Sending EXECUTE command to Java and Halting.| (crlf))
    
-   # Remover planning-started
-   (<s> ^planning-started 1 -)
-   
-   # Remover general_state
-   (<s> ^general_state <gs> -)
-   
-   # Resetar action para wander
-   (<s> ^action <act> -)
-   (<s> ^action <newAct>)
-   (<newAct> ^name wander)
-   
-   (write |APPLIED: Planned deliver leaflet ID: | <leafletId> | - Step: | <currentStep> (crlf))
-   (write |EXECUTION STARTED - First command being executed| (crlf))
+   # 4. Para o agente Soar para que o Java possa ler o output-link sem interferência
+   (halt)
 }
 
 # Preferências para as operações de entrega
@@ -542,6 +605,15 @@ sp {pref*plan-deliver-over-all
    (<s> ^operator <o1> > <o2>)
 }
 
+
+sp {pref*halt-over-all
+   (state <s> ^operator <o1> +
+              ^operator <o2> +)
+   (<o1> ^name plan-deliver-leaflet)
+   (<o2> ^name count-jewel)
+-->
+   (<s> ^operator <o1> > <o2>)
+}
 
 ############### WANDERING STATE ###############
 # Verifica se deve sair do wandering:

@@ -53,6 +53,7 @@ public class SoarBridge
 
     // arraylist of objects that is the memory of the creature
     public ArrayList<Thing> creatureMemoryList = new ArrayList<Thing>();
+    public ArrayList<Command> plan = new ArrayList<Command>();
     
     Environment env;
     public Creature c;
