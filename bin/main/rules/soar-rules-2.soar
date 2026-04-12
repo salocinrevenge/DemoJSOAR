@@ -320,58 +320,45 @@ sp {propose*plan-move-jewel
 sp {apply*plan-move-jewel
    (state <s> ^operator <o>
               ^general_state <gs>
-              ^io <io>)
-   (<io> ^output-link <ol>
-         ^input-link <il>)
-   (<il> ^CREATURE <creature>)
-   (<creature> ^PARAMETERS.MINFUEL <minFuel>)
-   (<ol> ^plan <plan>)
+              ^io.output-link.plan <plan>)
    (<o> ^name plan-move-jewel)
-   (<o> ^target-color <color>)
    (<o> ^target-coordinate <coord>)
-   (<coord> ^x <x>)
-   (<coord> ^y <y>)
+   (<coord> ^x <x> ^y <y>)
    (<o> ^target-entity <entity>)
+   (<o> ^target-entity-name <entityName>)
    (<o> ^missing-color-ref <mc>)
    (<o> ^current-step <currentStep>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<gs> ^fuel <fuelCopy>)
-   (<fuelCopy> ^value <fuelValue> > <minFuel>)
+   (<plan> ^step <currentStep>) # O step atual deve bater com o do operador
    (<sacoNeg> ^total-missing <totalMissing>)
    (<mc> ^count <count>)
    (<mc> ^visible-count <visibleCount>)
-   (<plan> ^step <currentStep>)
 -->
-   # Criar elemento no plan para este step com o MOVE
+   # 1. Adiciona o MOVE no step atual
    (<plan> ^<currentStep> <stepAction>)
    (<stepAction> ^MOVE <command>)
-   (<command> ^Vel 1)
-   (<command> ^VelR 1)
-   (<command> ^VelL 1)
-   (<command> ^X <x>)
-   (<command> ^Y <y>)
+   (<command> ^Vel 1 ^VelR 1 ^VelL 1 ^X <x> ^Y <y>)
    
-   # Incrementar o step do plan
+   # 2. Adiciona o GET no próximo step (current + 1)
+   (<plan> ^(+ <currentStep> 1) <getAction>)
+   (<getAction> ^GET <getCommand>)
+   (<getCommand> ^Name <entityName>)
+
+   # 3. Atualiza o ponteiro do step para dali a 2 posições
    (<plan> ^step <currentStep> -
-                (+ <currentStep> 1))
-   
-   # Remover a joia da lista visual do general state
-   (<gs> ^visual.entity-list <entityList>)
-   (<entityList> ^entity <entity> -)
-   
-   # Decrementar count do missing-color
+           ^step (+ <currentStep> 2))
+
+   # 4. Atualiza o Saco Negativo e remove a entidade "planejada"
+   (<gs> ^visual.entity-list <el>)
+   (<el> ^entity <entity> -)
    (<mc> ^count <count> -
-            (- <count> 1))
-   
-   # Decrementar visible-count
+         ^count (- <count> 1))
    (<mc> ^visible-count <visibleCount> -
-                     (- <visibleCount> 1))
-   
-   # Decrementar total-missing
+         ^visible-count (- <visibleCount> 1))
    (<sacoNeg> ^total-missing <totalMissing> -
-                        (- <totalMissing> 1))
-   
-   (write |APPLIED: Planned move to collect | <color> | at (| <x> |, | <y> |) - Step: | <currentStep> (crlf))
+              ^total-missing (- <totalMissing> 1))
+
+   (write |APPLIED: Planned MOVE and GET for | <entityName> | - New Step: | (+ <currentStep> 2) (crlf))
 }
 
 # Preferência entre operadores plan-move-jewel
@@ -422,7 +409,8 @@ sp {pref*plan-move-over-wander
 sp {propose*plan-move-delivery-spot
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing 0)
+   (<sacoNeg> ^total-missing <totalMissing>)
+   (eval <totalMissing> <= 0)
    # Encontra o ponto de entrega na lista visual
    (<gs> ^visual.entity-list.entity <entity>)
    (<entity> ^type DELIVERYSPOT)
@@ -481,7 +469,8 @@ sp {apply*plan-move-delivery-spot
 sp {propose*plan-deliver-leaflet
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing 0)
+   (<sacoNeg> ^total-missing <totalMissing>)
+   (eval <totalMissing> <= 0)
    # Encontra o ponto de entrega muito próximo
    (<gs> ^visual.entity-list.entity <entity>)
    (<entity> ^type DELIVERYSPOT)
