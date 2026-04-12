@@ -54,6 +54,10 @@ public class SoarBridge
     // arraylist of objects that is the memory of the creature
     public ArrayList<Thing> creatureMemoryList = new ArrayList<Thing>();
     public ArrayList<Command> plan = new ArrayList<Command>();
+
+    public boolean isExecutingPlan = false;
+    public int currentPlanStep = 0;
+    private CommandMove currentMoveCommand = null;
     
     Environment env;
     public Creature c;
@@ -435,6 +439,91 @@ public class SoarBridge
                             System.out.println("Command Deliver adicionado a lista de comandos a serem processados");
                             break;
 
+                        case EXECUTE:
+                            System.out.println("Processando comando EXECUTE ...");
+                            plan.clear();
+                            Wme planWme = null;
+                            for (Wme w : Commands) {
+                                if (w.getAttribute().toString().equals("plan")) {
+                                    planWme = w;
+                                }
+                            }
+                            if (planWme != null) {
+                                Identifier planId = planWme.getValue().asIdentifier();
+                                int maxStep = -1;
+                                for (Wme stepWme : Wmes.matcher(agent).filter(planId)) {
+                                    try {
+                                        int stepNum = Integer.parseInt(stepWme.getAttribute().toString());
+                                        if (stepNum > maxStep) maxStep = stepNum;
+                                    } catch (NumberFormatException e) {}
+                                }
+                                
+                                for (int i = 0; i <= maxStep; i++) {
+                                    for (Wme stepWme : Wmes.matcher(agent).filter(planId)) {
+                                        if (stepWme.getAttribute().toString().equals(String.valueOf(i))) {
+                                            Identifier actionId = stepWme.getValue().asIdentifier();
+                                            for (Wme actionWme : Wmes.matcher(agent).filter(actionId)) {
+                                                String cmdName = actionWme.getAttribute().toString();
+                                                Command.CommandType cmdType = null;
+                                                try { cmdType = Enum.valueOf(Command.CommandType.class, cmdName); } catch(Exception e) { continue; }
+                                                Command cmdObj = new Command(cmdType);
+                                                Identifier paramsId = actionWme.getValue().asIdentifier();
+                                                
+                                                switch (cmdType) {
+                                                    case MOVE:
+                                                        CommandMove commandMovePlan = (CommandMove)cmdObj.getCommandArgument();
+                                                        for (Wme p : Wmes.matcher(agent).filter(paramsId)) {
+                                                            String pName = p.getAttribute().toString();
+                                                            String pVal = p.getValue().toString();
+                                                            Float val = tryParseFloat(pVal);
+                                                            if (val != null) {
+                                                                if (pName.equals("VelR")) commandMovePlan.setRightVelocity(val);
+                                                                if (pName.equals("VelL")) commandMovePlan.setLeftVelocity(val);
+                                                                if (pName.equals("Vel")) commandMovePlan.setLinearVelocity(val);
+                                                                if (pName.equals("X")) commandMovePlan.setX(val);
+                                                                if (pName.equals("Y")) commandMovePlan.setY(val);
+                                                            }
+                                                        }
+                                                        break;
+                                                    case GET:
+                                                        CommandGet commandGetPlan = (CommandGet)cmdObj.getCommandArgument();
+                                                        for (Wme p : Wmes.matcher(agent).filter(paramsId)) {
+                                                            if (p.getAttribute().toString().equals("Name")) commandGetPlan.setThingName(p.getValue().toString());
+                                                        }
+                                                        break;
+                                                    case EAT:
+                                                        CommandEat commandEatPlan = (CommandEat)cmdObj.getCommandArgument();
+                                                        for (Wme p : Wmes.matcher(agent).filter(paramsId)) {
+                                                            if (p.getAttribute().toString().equals("Name")) commandEatPlan.setThingName(p.getValue().toString());
+                                                        }
+                                                        break;
+                                                    case DELIVER:
+                                                        CommandDeliver commandDeliverPlan = (CommandDeliver)cmdObj.getCommandArgument();
+                                                        for (Wme p : Wmes.matcher(agent).filter(paramsId)) {
+                                                            if (p.getAttribute().toString().equals("ID")) commandDeliverPlan.setLeafletId(p.getValue().toString());
+                                                        }
+                                                        break;
+                                                    default:
+                                                        break;
+                                                }
+                                                plan.add(cmdObj);
+                                            }
+                                        }
+                                    }
+                                }
+                                System.out.println("Plano contém " + plan.size() + " passos.");
+                                if (plan.size() > 0) {
+                                    isExecutingPlan = true;
+                                    currentPlanStep = 0;
+                                    Command firstCmd = plan.get(0);
+                                    if (firstCmd.getCommandType() == Command.CommandType.MOVE) {
+                                        currentMoveCommand = (CommandMove)firstCmd.getCommandArgument();
+                                    }
+                                    commandList.add(firstCmd);
+                                }
+                            }
+                            break;
+
                         default:
                             break;
                     }   
@@ -456,6 +545,47 @@ public class SoarBridge
      */
     public void step() throws CommandExecException
     {
+        if (isExecutingPlan) {
+            c.updateState();
+            
+            if (currentMoveCommand != null) {
+                if (currentMoveCommand.getX() != null && currentMoveCommand.getY() != null) {
+                    double targetX = currentMoveCommand.getX();
+                    double targetY = currentMoveCommand.getY();
+                    double currX = c.getPosition().getX();
+                    double currY = c.getPosition().getY();
+                    double distance = Math.sqrt(Math.pow(targetX - currX, 2) + Math.pow(targetY - currY, 2));
+                    
+                    if (distance > 30.0) {
+                        return; // Still moving, wait
+                    }
+                }
+                
+                // Finished moving
+                currentMoveCommand = null;
+            }
+            
+            // Go to next step
+            currentPlanStep++;
+            if (currentPlanStep < plan.size()) {
+                System.out.println("Executando passo " + currentPlanStep + " do plano.");
+                Command nextCmd = plan.get(currentPlanStep);
+                List<Command> lst = new ArrayList<Command>();
+                lst.add(nextCmd);
+                if (nextCmd.getCommandType() == Command.CommandType.MOVE) {
+                    currentMoveCommand = (CommandMove)nextCmd.getCommandArgument();
+                }
+                processCommands(lst);
+            } else {
+                // Plan finished!
+                isExecutingPlan = false;
+                plan.clear();
+                System.out.println("Plano concluido. Retornando ao raciocinio SOAR.");
+                // Let the next loop iteration call runSOAR
+            }
+            return;
+        }
+
         if (phase != -1) finish_msteps();
         resetSimulation();
         c.updateState();
