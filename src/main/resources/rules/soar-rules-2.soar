@@ -285,11 +285,11 @@ sp {pref*count-over-planning
 sp {propose*plan-move-jewel
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing <totalMissing> <> 0)
+   (<sacoNeg> ^total-missing <totalMissing> > 0)
    # Encontra uma cor que ainda tem jóias para coletar
    (<sacoNeg> ^missing-color <mc>)
    (<mc> ^color <color>)
-   (<mc> ^count <count> <> 0)
+   (<mc> ^count <count> > 0)
    # Encontra uma entidade visual com essa cor
    (<gs> ^visual.entity-list.entity <entity>)
    (<entity> ^type JEWEL)
@@ -409,28 +409,21 @@ sp {pref*plan-move-over-wander
 sp {propose*plan-move-delivery-spot
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing <totalMissing>)
-   (eval <totalMissing> <= 0)
-   # Encontra o ponto de entrega na lista visual
+   (<sacoNeg> ^total-missing <= 0) # MUDANÇA AQUI: Sintaxe correta Soar
    (<gs> ^visual.entity-list.entity <entity>)
-   (<entity> ^type DELIVERYSPOT)
-   (<entity> ^x <x>)
-   (<entity> ^y <y>)
-   (<entity> ^name <entityName>)
-   # Obtém o step atual do plano
+   (<entity> ^type DELIVERYSPOT ^x <x> ^y <y> ^name <entityName>)
    (state <s> ^io.output-link.plan <plan>)
    (<plan> ^step <currentStep>)
    (<s> ^planning-started 1)
 -->
    (<s> ^operator <o> + =)
-   (<o> ^name plan-move-delivery-spot)
-   (<o> ^target-coordinate <coord>)
-   (<coord> ^x <x>)
-   (<coord> ^y <y>)
-   (<o> ^target-entity <entity>)
-   (<o> ^target-entity-name <entityName>)
-   (<o> ^current-step <currentStep>)
-   (write |PROPOSED: Plan move to delivery spot at (| <x> |, | <y> |)| (crlf))
+   (<o> ^name plan-move-delivery-spot
+        ^target-coordinate <coord>
+        ^target-entity <entity>
+        ^target-entity-name <entityName>
+        ^current-step <currentStep>)
+   (<coord> ^x <x> ^y <y>)
+   (write |PROPOSED: All items collected. Planning move to delivery spot.| (crlf))
 }
 
 # Aplicação do operador plan-move-delivery-spot
@@ -469,30 +462,20 @@ sp {apply*plan-move-delivery-spot
 sp {propose*plan-deliver-leaflet
    (state <s> ^general_state <gs>)
    (<gs> ^sacoNeg <sacoNeg>)
-   (<sacoNeg> ^total-missing <totalMissing>)
-   (eval <totalMissing> <= 0)
-   # Encontra o ponto de entrega muito próximo
+   (<sacoNeg> ^total-missing <= 0) # MUDANÇA AQUI
    (<gs> ^visual.entity-list.entity <entity>)
-   (<entity> ^type DELIVERYSPOT)
-   (<entity> ^distance <distance> < 30)
-   # Obtém informações do leaflet
-   (state <s> ^io.input-link <il>)
-   (<il> ^CREATURE <creature>)
-   (<creature> ^LEAFLETS <leaflets>)
-   (<leaflets> ^LEAFLET <leaflet>)
-   (<leaflet> ^ID <leafletId>)
-   (<leaflet> ^SCORE <score>)
+   (<entity> ^type DELIVERYSPOT ^distance < 30)
+   (state <s> ^io.input-link.CREATURE.LEAFLETS.LEAFLET <leaflet>)
+   (<leaflet> ^ID <leafletId> ^SCORE <score>)
    (<sacoNeg> ^leaflet-id <leafletId>)
-   # Obtém o step atual do plano
    (state <s> ^io.output-link.plan <plan>)
    (<plan> ^step <currentStep>)
 -->
    (<s> ^operator <o> + =)
-   (<o> ^name plan-deliver-leaflet)
-   (<o> ^leaflet-id <leafletId>)
-   (<o> ^leaflet-score <score>)
-   (<o> ^current-step <currentStep>)
-   (write |PROPOSED: Plan deliver leaflet ID: | <leafletId> | with score: | <score> (crlf))
+   (<o> ^name plan-deliver-leaflet
+        ^leaflet-id <leafletId>
+        ^leaflet-score <score>
+        ^current-step <currentStep>)
 }
 
 # Aplicação do operador plan-deliver-leaflet
