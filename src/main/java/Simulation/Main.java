@@ -25,12 +25,12 @@ public class Main
         Logger.getLogger("Simulation").setLevel(Level.SEVERE);
     }
 
-    public Main() {
+    public Main(String soarRuleFile) {
         SilenceLoggers();
         try
         {
-            NativeUtils.loadFileFromJar("/rules/soar-rules-2.soar");
-            String soarRulesPath = "soar-rules-2.soar";
+            NativeUtils.loadFileFromJar("/rules/"+soarRuleFile);
+            String soarRulesPath = soarRuleFile;
 
             //Start enviroment data
             Environment e = new Environment(Boolean.FALSE);
@@ -62,7 +62,11 @@ public class Main
 
     public static void main(String[] args)
     {
-        Main m = new Main();
+        if (args.length < 1) {
+            System.out.println("Usage: java Main <soar-rule-file>");
+            return;
+        }
+        Main m = new Main(args[0]);
     }
 
 
